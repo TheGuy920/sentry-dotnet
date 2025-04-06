@@ -57,24 +57,6 @@ public static partial class SentrySdk
 #pragma warning restore 0162
 #pragma warning restore CS0162 // Unreachable code detected
 
-        // Initialize native platform SDKs here
-        if (options.InitNativeSdks)
-        {
-#if __IOS__
-            InitSentryCocoaSdk(options);
-#elif ANDROID
-            InitSentryAndroidSdk(options);
-#elif NET8_0_OR_GREATER
-            // TODO: Is this working properly? Currently we don't have any way to check if the app is being compiled AOT
-            // All we know is whether trimming has been enabled or not. I think at the moment we'll be initialising
-            // SentryNative for managed applications when they've been trimmed!
-            if (SentryNative.IsAvailable)
-            {
-                InitNativeSdk(options);
-            }
-#endif
-        }
-
         // We init the hub after native SDK in case the native init needs to adapt some options.
         var hub = new Hub(options);
 
@@ -85,25 +67,10 @@ public static partial class SentrySdk
         }
         options.PostInitCallbacks.Clear();
 
-        // Platform specific check for profiler misconfiguration.
-#if __IOS__
-        // No user-facing warning necessary - the integration is part of InitSentryCocoaSdk().
-        Debug.Assert(options.IsProfilingEnabled == (options.TransactionProfilerFactory is not null));
-#elif ANDROID
-        LogWarningIfProfilingMisconfigured(options, " on Android");
-#else
-#if NET8_0_OR_GREATER
-        if (AotHelper.IsTrimmed)
-        {
-            LogWarningIfProfilingMisconfigured(options, " for NativeAOT");
-        }
-        else
-#endif
         {
             LogWarningIfProfilingMisconfigured(options, ", because ProfilingIntegration from package Sentry.Profiling" +
             " hasn't been registered. You can do that by calling 'options.AddProfilingIntegration()'");
         }
-#endif
 
         return hub;
     }

@@ -12,18 +12,6 @@ public abstract class SentryMessageHandler : DelegatingHandler
     private readonly SentryOptions? _options;
     private readonly object _innerHandlerLock = new();
 
-    /// <summary>
-    /// Constructs an instance of <see cref="SentryMessageHandler"/>.
-    /// </summary>
-    protected SentryMessageHandler()
-        : this(default, default, default) { }
-
-    /// <summary>
-    /// Constructs an instance of <see cref="SentryMessageHandler"/>.
-    /// </summary>
-    /// <param name="innerHandler">An inner message handler to delegate calls to.</param>
-    protected SentryMessageHandler(HttpMessageHandler innerHandler)
-        : this(default, default, innerHandler) { }
 
     /// <summary>
     /// Constructs an instance of <see cref="SentryMessageHandler"/>.
@@ -46,7 +34,7 @@ public abstract class SentryMessageHandler : DelegatingHandler
 
     internal SentryMessageHandler(IHub? hub, SentryOptions? options, HttpMessageHandler? innerHandler = default)
     {
-        _hub = hub ?? HubAdapter.Instance;
+        _hub = hub ?? null!;
         _options = options ?? _hub.GetSentryOptions();
 
         // Only assign the inner handler if it is supplied.  We can't assign null or it will throw.
@@ -97,29 +85,6 @@ public abstract class SentryMessageHandler : DelegatingHandler
             throw;
         }
     }
-
-#if NET5_0_OR_GREATER
-    /// <inheritdoc />
-    protected override HttpResponseMessage Send(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        var method = request.Method.Method.ToUpperInvariant();
-        var url = request.RequestUri?.ToString() ?? string.Empty;
-
-        var span = ProcessRequest(request, method, url);
-        try
-        {
-            PropagateTraceHeaders(request, url);
-            var response = base.Send(request, cancellationToken);
-            HandleResponse(response, span, method, url);
-            return response;
-        }
-        catch (Exception ex)
-        {
-            span?.Finish(ex);
-            throw;
-        }
-    }
-#endif
 
     private void PropagateTraceHeaders(HttpRequestMessage request, string url)
     {

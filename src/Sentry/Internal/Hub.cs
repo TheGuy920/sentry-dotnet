@@ -14,10 +14,6 @@ internal class Hub : IHub, IDisposable
     private readonly SentryOptions _options;
     private readonly RandomValuesFactory _randomValuesFactory;
 
-#if MEMORY_DUMP_SUPPORTED
-    private readonly MemoryMonitor? _memoryMonitor;
-#endif
-
     private int _isPersistedSessionRecovered;
 
     // Internal for testability
