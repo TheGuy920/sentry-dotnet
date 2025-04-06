@@ -55,17 +55,19 @@ internal class CachingTransport : ITransport, IDisposable
 
     private readonly IFileSystem _fileSystem;
 
-    public static CachingTransport Create(ITransport innerTransport, SentryOptions options,
+    public static CachingTransport Create(SentrySdk sdk, ITransport innerTransport, SentryOptions options,
         bool startWorker = true,
         bool failStorage = false)
     {
-        var transport = new CachingTransport(innerTransport, options, failStorage);
+        var transport = new CachingTransport(sdk, innerTransport, options, failStorage);
         transport.Initialize(startWorker);
         return transport;
     }
 
-    private CachingTransport(ITransport innerTransport, SentryOptions options, bool failStorage)
+    private readonly SentrySdk _sdk;
+    private CachingTransport(SentrySdk sdk, ITransport innerTransport, SentryOptions options, bool failStorage)
     {
+        _sdk = sdk;
         _innerTransport = innerTransport;
         _options = options;
         _failStorage = failStorage; // For testing
@@ -337,7 +339,7 @@ internal class CachingTransport : ITransport, IDisposable
             await using (stream.ConfigureAwait(false))
 #endif
             {
-                using (var envelope = await Envelope.DeserializeAsync(stream, cancellation).ConfigureAwait(false))
+                using (var envelope = await Envelope.DeserializeAsync(_sdk, stream, cancellation).ConfigureAwait(false))
                 {
                     // Don't even try to send it if we are requesting cancellation.
                     cancellation.ThrowIfCancellationRequested();
@@ -504,7 +506,7 @@ internal class CachingTransport : ITransport, IDisposable
         var clientReport = _options.ClientReportRecorder.GenerateClientReport();
         if (clientReport != null)
         {
-            envelope = envelope.WithItem(EnvelopeItem.FromClientReport(clientReport));
+            envelope = envelope.WithItem(_sdk, EnvelopeItem.FromClientReport(clientReport));
             _options.LogDebug("Attached client report to envelope {0}.", envelope.TryGetEventId(_options.DiagnosticLogger));
         }
 

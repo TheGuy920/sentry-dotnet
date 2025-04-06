@@ -273,28 +273,32 @@ public class Scope : IEventLike
     /// </summary>
     public IReadOnlyCollection<SentryAttachment> Attachments => _attachments;
 
+    private readonly SentrySdk sSdk;
+
     /// <summary>
     /// Creates a scope with the specified options.
     /// </summary>
-    public Scope(SentryOptions? options)
-        : this(options, null)
+    public Scope(SentrySdk sdk,SentryOptions? options)
+        : this(sdk, options, null)
     {
     }
 
-    internal Scope(SentryOptions? options, SentryPropagationContext? propagationContext)
+    internal Scope(SentrySdk sdk, SentryOptions? options, SentryPropagationContext? propagationContext)
     {
+        sSdk = sdk;
         Options = options ?? new SentryOptions();
         PropagationContext = new SentryPropagationContext(propagationContext);
     }
 
     // For testing. Should explicitly require SentryOptions.
-    internal Scope()
-        : this(new SentryOptions())
+    internal Scope(SentrySdk sdk)
+        : this(sdk, new SentryOptions())
     {
+        sSdk = sdk;
     }
 
     /// <inheritdoc />
-    public void AddBreadcrumb(Breadcrumb breadcrumb) => AddBreadcrumb(breadcrumb, new SentryHint());
+    public void AddBreadcrumb(Breadcrumb breadcrumb) => AddBreadcrumb(breadcrumb, new SentryHint(sSdk));
 
     /// <summary>
     /// Adds a breadcrumb with a hint.
@@ -534,7 +538,7 @@ public class Scope : IEventLike
     /// </summary>
     public Scope Clone()
     {
-        var clone = new Scope(Options, PropagationContext)
+        var clone = new Scope(sSdk, Options, PropagationContext)
         {
             OnEvaluating = OnEvaluating
         };

@@ -9,16 +9,18 @@ internal class HttpTransport : HttpTransportBase, ITransport
 {
     private readonly HttpClient _httpClient;
 
-    public HttpTransport(SentryOptions options, HttpClient httpClient)
-        : base(options)
+    public HttpTransport(SentrySdk sdk, SentryOptions options, HttpClient httpClient)
+        : base(sdk, options)
     {
         _httpClient = httpClient;
     }
 
-    internal HttpTransport(SentryOptions options, HttpClient httpClient,
+    internal HttpTransport(
+        SentrySdk sdk,
+        SentryOptions options, HttpClient httpClient,
         Func<string, string?>? getEnvironmentVariable = default,
         ISystemClock? clock = default)
-        : base(options, getEnvironmentVariable, clock)
+        : base(sdk, options, getEnvironmentVariable, clock)
     {
         _httpClient = httpClient;
     }

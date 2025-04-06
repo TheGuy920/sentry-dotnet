@@ -7,9 +7,11 @@ internal class SentryHttpFailedRequestHandler : SentryFailedRequestHandler
 {
     public const string MechanismType = "SentryHttpFailedRequestHandler";
 
+    private IHub hub;
     internal SentryHttpFailedRequestHandler(IHub hub, SentryOptions options)
     : base(hub, options)
     {
+        this.hub = hub;
     }
 
     protected internal override void DoEnsureSuccessfulResponse([NotNull] HttpRequestMessage request, [NotNull] HttpResponseMessage response)
@@ -37,7 +39,7 @@ internal class SentryHttpFailedRequestHandler : SentryFailedRequestHandler
             exception.SetSentryMechanism(MechanismType);
 
             var @event = new SentryEvent(exception);
-            var hint = new SentryHint(HintTypes.HttpResponseMessage, response);
+            var hint = new SentryHint(hub.Sdk ?? null!, HintTypes.HttpResponseMessage, response);
 
             var uri = response.RequestMessage?.RequestUri;
             var sentryRequest = new SentryRequest

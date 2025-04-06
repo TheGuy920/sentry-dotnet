@@ -25,6 +25,11 @@ public class SentryClient : ISentryClient, IDisposable
     internal SentryOptions Options => _options;
 
     /// <summary>
+    /// the Sentry sdk.
+    /// </summary>
+    public SentrySdk? Sdk { get; }
+
+    /// <summary>
     /// Whether the client is enabled.
     /// </summary>
     /// <inheritdoc />
@@ -33,16 +38,19 @@ public class SentryClient : ISentryClient, IDisposable
     /// <summary>
     /// Creates a new instance of <see cref="SentryClient"/>.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="options">The configuration for this client.</param>
-    public SentryClient(SentryOptions options)
-        : this(options, null, null, null) { }
+    public SentryClient(SentrySdk sdk,SentryOptions options)
+        : this(sdk, options, null, null, null) { }
 
     internal SentryClient(
+        SentrySdk sdk,
         SentryOptions options,
         IBackgroundWorker? worker = null,
         RandomValuesFactory? randomValuesFactory = null,
         ISessionManager? sessionManager = null)
     {
+        Sdk = sdk;
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _randomValuesFactory = randomValuesFactory ?? new SynchronizedRandomValuesFactory();
         _sessionManager = sessionManager ?? new GlobalSessionManager(options);
@@ -53,7 +61,7 @@ public class SentryClient : ISentryClient, IDisposable
         if (worker == null)
         {
             var composer = new SdkComposer(options);
-            Worker = composer.CreateBackgroundWorker();
+            Worker = composer.CreateBackgroundWorker(Sdk!);
         }
         else
         {
@@ -90,8 +98,8 @@ public class SentryClient : ISentryClient, IDisposable
             return;
         }
 
-        scope ??= new Scope(_options);
-        hint ??= new SentryHint();
+        scope ??= new Scope(Sdk!, _options);
+        hint ??= new SentryHint(_options);
         hint.AddAttachmentsFromScope(scope);
 
         _options.LogInfo("Capturing feedback: '{0}'.", feedback.Message);
@@ -112,7 +120,7 @@ public class SentryClient : ISentryClient, IDisposable
         }
 
         var attachments = hint.Attachments.ToList();
-        var envelope = Envelope.FromFeedback(evt, _options.DiagnosticLogger, attachments, scope.SessionUpdate);
+        var envelope = Envelope.FromFeedback(Sdk!, evt, _options.DiagnosticLogger, attachments, scope.SessionUpdate);
         CaptureEnvelope(envelope);
     }
 
@@ -127,7 +135,7 @@ public class SentryClient : ISentryClient, IDisposable
             return;
         }
 
-        CaptureEnvelope(Envelope.FromUserFeedback(userFeedback));
+        CaptureEnvelope(Envelope.FromUserFeedback(Sdk!, userFeedback));
     }
 
     /// <inheritdoc />
@@ -171,8 +179,8 @@ public class SentryClient : ISentryClient, IDisposable
             return;
         }
 
-        scope ??= new Scope(_options);
-        hint ??= new SentryHint();
+        scope ??= new Scope(Sdk!, _options);
+        hint ??= new SentryHint(_options);
         hint.AddAttachmentsFromScope(scope);
 
         _options.LogInfo("Capturing transaction.");
@@ -209,7 +217,7 @@ public class SentryClient : ISentryClient, IDisposable
             processedTransaction.Redact();
         }
 
-        CaptureEnvelope(Envelope.FromTransaction(processedTransaction));
+        CaptureEnvelope(Envelope.FromTransaction(Sdk!, processedTransaction));
     }
 
 #if NET6_0_OR_GREATER
@@ -260,7 +268,7 @@ public class SentryClient : ISentryClient, IDisposable
 
     /// <inheritdoc />
     public void CaptureSession(SessionUpdate sessionUpdate)
-        => CaptureEnvelope(Envelope.FromSession(sessionUpdate));
+        => CaptureEnvelope(Envelope.FromSession(Sdk!, sessionUpdate));
 
     /// <inheritdoc />
     public SentryId CaptureCheckIn(
@@ -271,7 +279,7 @@ public class SentryClient : ISentryClient, IDisposable
         Scope? scope = null,
         Action<SentryMonitorOptions>? configureMonitorOptions = null)
     {
-        scope ??= new Scope(_options);
+        scope ??= new Scope(Sdk!, _options);
 
         var traceId = scope.PropagationContext.TraceId;
         if (scope.Span is not null)
@@ -295,7 +303,7 @@ public class SentryClient : ISentryClient, IDisposable
 
         _enricher.Apply(checkIn);
 
-        return CaptureEnvelope(Envelope.FromCheckIn(checkIn))
+        return CaptureEnvelope(Envelope.FromCheckIn(Sdk!, checkIn))
             ? checkIn.Id
             : SentryId.Empty;
     }
@@ -319,8 +327,8 @@ public class SentryClient : ISentryClient, IDisposable
             return SentryId.Empty;
         }
 
-        scope ??= new Scope(_options);
-        hint ??= new SentryHint();
+        scope ??= new Scope(Sdk!, _options);
+        hint ??= new SentryHint(_options);
         hint.AddAttachmentsFromScope(scope);
 
         _options.LogInfo("Capturing event.");
@@ -404,7 +412,7 @@ public class SentryClient : ISentryClient, IDisposable
         }
 
         var attachments = hint.Attachments.ToList();
-        var envelope = Envelope.FromEvent(processedEvent, _options.DiagnosticLogger, attachments, scope.SessionUpdate);
+        var envelope = Envelope.FromEvent(Sdk!, processedEvent, _options.DiagnosticLogger, attachments, scope.SessionUpdate);
         return CaptureEnvelope(envelope) ? processedEvent.EventId : SentryId.Empty;
     }
 

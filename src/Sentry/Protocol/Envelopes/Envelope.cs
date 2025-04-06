@@ -28,11 +28,13 @@ public sealed class Envelope : ISerializable, IDisposable
     /// <summary>
     /// Initializes an instance of <see cref="Envelope"/>.
     /// </summary>
-    public Envelope(IReadOnlyDictionary<string, object?> header, IReadOnlyList<EnvelopeItem> items)
-        : this(null, header, items) { }
+    public Envelope(SentrySdk sdk, IReadOnlyDictionary<string, object?> header, IReadOnlyList<EnvelopeItem> items)
+        : this(sdk, null, header, items) { }
 
-    private Envelope(SentryId? eventId, IReadOnlyDictionary<string, object?> header, IReadOnlyList<EnvelopeItem> items)
+    private SentrySdk _sdk;
+    private Envelope(SentrySdk sdk, SentryId? eventId, IReadOnlyDictionary<string, object?> header, IReadOnlyList<EnvelopeItem> items)
     {
+        _sdk = sdk;
         _eventId = eventId;
         Header = header;
         Items = items;
@@ -43,7 +45,7 @@ public sealed class Envelope : ISerializable, IDisposable
     /// </summary>
     public SentryId? TryGetEventId()
     {
-        var logger = SentrySdk.CurrentOptions?.DiagnosticLogger;
+        var logger = _sdk.CurrentOptions?.DiagnosticLogger;
         return TryGetEventId(logger);
     }
 
@@ -221,6 +223,7 @@ public sealed class Envelope : ISerializable, IDisposable
     /// Creates an envelope that contains a single event.
     /// </summary>
     public static Envelope FromEvent(
+        SentrySdk sdk,
         SentryEvent @event,
         IDiagnosticLogger? logger = null,
         IReadOnlyCollection<SentryAttachment>? attachments = null,
@@ -254,7 +257,7 @@ public sealed class Envelope : ISerializable, IDisposable
             items.Add(EnvelopeItem.FromSession(sessionUpdate));
         }
 
-        return new Envelope(eventId, header, items);
+        return new Envelope(sdk, eventId, header, items);
     }
 
     private static void AddEnvelopeItemFromAttachment(List<EnvelopeItem> items, SentryAttachment attachment,
@@ -290,6 +293,7 @@ public sealed class Envelope : ISerializable, IDisposable
     /// Creates an envelope that contains a single feedback event.
     /// </summary>
     public static Envelope FromFeedback(
+        SentrySdk sdk,
         SentryEvent @event,
         IDiagnosticLogger? logger = null,
         IReadOnlyCollection<SentryAttachment>? attachments = null,
@@ -324,14 +328,14 @@ public sealed class Envelope : ISerializable, IDisposable
             items.Add(EnvelopeItem.FromSession(sessionUpdate));
         }
 
-        return new Envelope(eventId, header, items);
+        return new Envelope(sdk, eventId, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains a single user feedback.
     /// </summary>
     [Obsolete("Use FromFeedback instead.")]
-    public static Envelope FromUserFeedback(UserFeedback sentryUserFeedback)
+    public static Envelope FromUserFeedback(SentrySdk sdk, UserFeedback sentryUserFeedback)
     {
         var eventId = sentryUserFeedback.EventId;
         var header = CreateHeader(eventId);
@@ -341,13 +345,13 @@ public sealed class Envelope : ISerializable, IDisposable
             EnvelopeItem.FromUserFeedback(sentryUserFeedback)
         };
 
-        return new Envelope(eventId, header, items);
+        return new Envelope(sdk, eventId, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains a single transaction.
     /// </summary>
-    public static Envelope FromTransaction(SentryTransaction transaction)
+    public static Envelope FromTransaction(SentrySdk sdk, SentryTransaction transaction)
     {
         var eventId = transaction.EventId;
         var header = CreateHeader(eventId, transaction.DynamicSamplingContext);
@@ -368,26 +372,26 @@ public sealed class Envelope : ISerializable, IDisposable
             }
         }
 
-        return new Envelope(eventId, header, items);
+        return new Envelope(sdk, eventId, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains one or more <see cref="CodeLocations"/>
     /// </summary>
-    internal static Envelope FromCodeLocations(CodeLocations codeLocations)
+    internal static Envelope FromCodeLocations(SentrySdk sdk, CodeLocations codeLocations)
     {
         var header = DefaultHeader;
 
         var items = new List<EnvelopeItem>(1);
         items.Add(EnvelopeItem.FromCodeLocations(codeLocations));
 
-        return new Envelope(header, items);
+        return new Envelope(sdk, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains one or more Metrics
     /// </summary>
-    internal static Envelope FromMetrics(IEnumerable<Metric> metrics)
+    internal static Envelope FromMetrics(SentrySdk sdk, IEnumerable<Metric> metrics)
     {
         var header = DefaultHeader;
 
@@ -397,13 +401,13 @@ public sealed class Envelope : ISerializable, IDisposable
             items.Add(EnvelopeItem.FromMetric(metric));
         }
 
-        return new Envelope(header, items);
+        return new Envelope(sdk, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains a session update.
     /// </summary>
-    public static Envelope FromSession(SessionUpdate sessionUpdate)
+    public static Envelope FromSession(SentrySdk sdk, SessionUpdate sessionUpdate)
     {
         var header = DefaultHeader;
 
@@ -412,25 +416,25 @@ public sealed class Envelope : ISerializable, IDisposable
             EnvelopeItem.FromSession(sessionUpdate)
         };
 
-        return new Envelope(header, items);
+        return new Envelope(sdk, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains a check in.
     /// </summary>
-    public static Envelope FromCheckIn(SentryCheckIn checkIn)
+    public static Envelope FromCheckIn(SentrySdk sdk, SentryCheckIn checkIn)
     {
         var header = DefaultHeader;
 
         var items = new[] { EnvelopeItem.FromCheckIn(checkIn) };
 
-        return new Envelope(header, items);
+        return new Envelope(sdk, header, items);
     }
 
     /// <summary>
     /// Creates an envelope that contains a client report.
     /// </summary>
-    internal static Envelope FromClientReport(ClientReport clientReport)
+    internal static Envelope FromClientReport(SentrySdk sdk, ClientReport clientReport)
     {
         var header = DefaultHeader;
 
@@ -439,7 +443,7 @@ public sealed class Envelope : ISerializable, IDisposable
             EnvelopeItem.FromClientReport(clientReport)
         };
 
-        return new Envelope(header, items);
+        return new Envelope(sdk, header, items);
     }
 
     private static async Task<IReadOnlyDictionary<string, object?>> DeserializeHeaderAsync(
@@ -462,6 +466,7 @@ public sealed class Envelope : ISerializable, IDisposable
     /// Deserializes envelope from stream.
     /// </summary>
     public static async Task<Envelope> DeserializeAsync(
+        SentrySdk sdk,
         Stream stream,
         CancellationToken cancellationToken = default)
     {
@@ -474,18 +479,19 @@ public sealed class Envelope : ISerializable, IDisposable
             items.Add(item);
         }
 
-        return new Envelope(header, items);
+        return new Envelope(sdk, header, items);
     }
 
     /// <summary>
     /// Creates a new <see cref="Envelope"/> starting from the current one and appends the <paramref name="item"/> given.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="item">The <see cref="EnvelopeItem"/> to append.</param>
     /// <returns>A new <see cref="Envelope"/> with the same headers and items, including the new <paramref name="item"/>.</returns>
-    internal Envelope WithItem(EnvelopeItem item)
+    internal Envelope WithItem(SentrySdk sdk, EnvelopeItem item)
     {
         var items = Items.ToList();
         items.Add(item);
-        return new Envelope(_eventId, Header, items);
+        return new Envelope(sdk, _eventId, Header, items);
     }
 }

@@ -13,8 +13,8 @@ internal class SpotlightHttpTransport : HttpTransport
     private readonly Uri _spotlightUrl;
     private readonly ISystemClock _clock;
 
-    public SpotlightHttpTransport(ITransport inner, SentryOptions options, HttpClient httpClient, Uri spotlightUrl, ISystemClock clock)
-        : base(options, httpClient)
+    public SpotlightHttpTransport(SentrySdk sdk, ITransport inner, SentryOptions options, HttpClient httpClient, Uri spotlightUrl, ISystemClock clock)
+        : base(sdk, options, httpClient)
     {
         _options = options;
         _httpClient = httpClient;

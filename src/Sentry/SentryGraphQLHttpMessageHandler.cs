@@ -18,19 +18,19 @@ public class SentryGraphQLHttpMessageHandler : SentryMessageHandler
     /// <summary>
     /// Constructs an instance of <see cref="SentryGraphQLHttpMessageHandler"/>.
     /// </summary>
-    /// <param name="innerHandler">An inner message handler to delegate calls to.</param>
     /// <param name="hub">The Sentry hub.</param>
-    public SentryGraphQLHttpMessageHandler(HttpMessageHandler? innerHandler = default, IHub? hub = default)
+    /// <param name="innerHandler">An inner message handler to delegate calls to.</param>
+    public SentryGraphQLHttpMessageHandler(IHub hub, HttpMessageHandler? innerHandler = default)
         : this(hub, default, innerHandler)
     {
     }
 
-    internal SentryGraphQLHttpMessageHandler(IHub? hub, SentryOptions? options,
+    internal SentryGraphQLHttpMessageHandler(IHub hub, SentryOptions? options,
         HttpMessageHandler? innerHandler = default,
         ISentryFailedRequestHandler? failedRequestHandler = null)
     : base(hub, options, innerHandler)
     {
-        _hub = hub ?? HubAdapter.Instance;
+        _hub = hub;
         _options = options ?? _hub.GetSentryOptions();
         _failedRequestHandler = failedRequestHandler;
         if (_options != null)

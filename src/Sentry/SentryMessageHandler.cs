@@ -15,19 +15,6 @@ public abstract class SentryMessageHandler : DelegatingHandler
     /// <summary>
     /// Constructs an instance of <see cref="SentryMessageHandler"/>.
     /// </summary>
-    protected SentryMessageHandler()
-        : this(default, default, default) { }
-
-    /// <summary>
-    /// Constructs an instance of <see cref="SentryMessageHandler"/>.
-    /// </summary>
-    /// <param name="innerHandler">An inner message handler to delegate calls to.</param>
-    protected SentryMessageHandler(HttpMessageHandler innerHandler)
-        : this(default, default, innerHandler) { }
-
-    /// <summary>
-    /// Constructs an instance of <see cref="SentryMessageHandler"/>.
-    /// </summary>
     /// <param name="hub">The Sentry hub.</param>
     protected SentryMessageHandler(IHub hub)
         : this(hub, default)
@@ -44,9 +31,9 @@ public abstract class SentryMessageHandler : DelegatingHandler
     {
     }
 
-    internal SentryMessageHandler(IHub? hub, SentryOptions? options, HttpMessageHandler? innerHandler = default)
+    internal SentryMessageHandler(IHub hub, SentryOptions? options, HttpMessageHandler? innerHandler = default)
     {
-        _hub = hub ?? HubAdapter.Instance;
+        _hub = hub;
         _options = options ?? _hub.GetSentryOptions();
 
         // Only assign the inner handler if it is supplied.  We can't assign null or it will throw.
@@ -168,9 +155,9 @@ public abstract class SentryMessageHandler : DelegatingHandler
 
             // Merge existing baggage headers with ours.
             var allBaggage = headers
-                .Select(s => BaggageHeader.TryParse(s)).ExceptNulls()
+                .Select(s => BaggageHeader.TryParse(_hub.Sdk!, s)).ExceptNulls()
                 .Append(baggage);
-            baggage = BaggageHeader.Merge(allBaggage);
+            baggage = BaggageHeader.Merge(_hub.Sdk!, allBaggage);
 
             // Remove the existing header so we can replace it with the merged one.
             request.Headers.Remove(BaggageHeader.HttpHeaderName);

@@ -13,14 +13,14 @@ namespace Sentry.Extensibility;
 /// </remarks>
 /// <inheritdoc cref="IHub" />
 [DebuggerStepThrough]
-public sealed class HubAdapter : IHub
+public sealed class HubAdapter(SentrySdk SentrySdk) : IHub
 {
     /// <summary>
-    /// The single instance which forwards all calls to <see cref="SentrySdk"/>
+    /// the Sentry sdk.
     /// </summary>
-    public static readonly HubAdapter Instance = new();
-
-    private HubAdapter() { }
+#pragma warning disable CS9124 // Parameter is captured into the state of the enclosing type and its value is also used to initialize a field, property, or event.
+    public SentrySdk? Sdk { get; } = SentrySdk;
+#pragma warning restore CS9124 // Parameter is captured into the state of the enclosing type and its value is also used to initialize a field, property, or event.
 
     /// <summary>
     /// Forwards the call to <see cref="SentrySdk"/>.

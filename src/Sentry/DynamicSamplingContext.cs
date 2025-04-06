@@ -91,7 +91,7 @@ internal class DynamicSamplingContext
         Items = items;
     }
 
-    public BaggageHeader ToBaggageHeader() => BaggageHeader.Create(Items, useSentryPrefix: true);
+    public BaggageHeader ToBaggageHeader(SentrySdk sdk) => BaggageHeader.Create(sdk, Items, useSentryPrefix: true);
 
     public static DynamicSamplingContext? CreateFromBaggageHeader(BaggageHeader baggage)
     {

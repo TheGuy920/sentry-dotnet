@@ -145,7 +145,7 @@ public static class HubExtensions
         }
 
         hub.ConfigureScope(
-            s => s.AddBreadcrumb(breadcrumb, hint ?? new SentryHint())
+            s => s.AddBreadcrumb(breadcrumb, hint ?? new SentryHint(hub.Sdk!))
             );
     }
 

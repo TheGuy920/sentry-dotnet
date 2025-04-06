@@ -19,7 +19,7 @@ internal sealed class SentryScopeManager : IInternalScopeManager
 
     private bool IsGlobalMode => ScopeStackContainer is GlobalScopeStackContainer;
 
-    public SentryScopeManager(SentryOptions options, ISentryClient rootClient)
+    public SentryScopeManager(SentrySdk sdk, SentryOptions options, ISentryClient rootClient)
     {
         ScopeStackContainer = options.ScopeStackContainer ?? (
             options.IsGlobalModeEnabled
@@ -27,7 +27,7 @@ internal sealed class SentryScopeManager : IInternalScopeManager
                 : new AsyncLocalScopeStackContainer());
 
         _options = options;
-        NewStack = () => new[] { new KeyValuePair<Scope, ISentryClient>(new Scope(options), rootClient) };
+        NewStack = () => new[] { new KeyValuePair<Scope, ISentryClient>(new Scope(sdk, options), rootClient) };
     }
 
     public KeyValuePair<Scope, ISentryClient> GetCurrent() => ScopeAndClientStack[^1];

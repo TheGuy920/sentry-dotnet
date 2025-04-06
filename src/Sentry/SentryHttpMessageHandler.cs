@@ -19,19 +19,6 @@ public class SentryHttpMessageHandler : SentryMessageHandler
     /// <summary>
     /// Constructs an instance of <see cref="SentryHttpMessageHandler"/>.
     /// </summary>
-    public SentryHttpMessageHandler()
-        : this(default, default, default) { }
-
-    /// <summary>
-    /// Constructs an instance of <see cref="SentryHttpMessageHandler"/>.
-    /// </summary>
-    /// <param name="innerHandler">An inner message handler to delegate calls to.</param>
-    public SentryHttpMessageHandler(HttpMessageHandler innerHandler)
-        : this(default, default, innerHandler) { }
-
-    /// <summary>
-    /// Constructs an instance of <see cref="SentryHttpMessageHandler"/>.
-    /// </summary>
     /// <param name="hub">The Sentry hub.</param>
     public SentryHttpMessageHandler(IHub hub)
         : this(hub, default)
@@ -48,10 +35,10 @@ public class SentryHttpMessageHandler : SentryMessageHandler
     {
     }
 
-    internal SentryHttpMessageHandler(IHub? hub, SentryOptions? options, HttpMessageHandler? innerHandler = default, ISentryFailedRequestHandler? failedRequestHandler = null)
+    internal SentryHttpMessageHandler(IHub hub, SentryOptions? options, HttpMessageHandler? innerHandler = default, ISentryFailedRequestHandler? failedRequestHandler = null)
         : base(hub, options, innerHandler)
     {
-        _hub = hub ?? HubAdapter.Instance;
+        _hub = hub;
         _options = options ?? _hub.GetSentryOptions();
         _failedRequestHandler = failedRequestHandler;
 

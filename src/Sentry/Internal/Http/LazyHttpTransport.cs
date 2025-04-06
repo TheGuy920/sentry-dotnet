@@ -7,9 +7,9 @@ internal class LazyHttpTransport : ITransport
 {
     private readonly Lazy<HttpTransport> _httpTransport;
 
-    public LazyHttpTransport(SentryOptions options)
+    public LazyHttpTransport(SentrySdk sdk, SentryOptions options)
     {
-        _httpTransport = new Lazy<HttpTransport>(() => new HttpTransport(options, options.GetHttpClient()));
+        _httpTransport = new Lazy<HttpTransport>(() => new HttpTransport(sdk, options, options.GetHttpClient()));
     }
 
     public Task SendEnvelopeAsync(Envelope envelope, CancellationToken cancellationToken = default)

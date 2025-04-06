@@ -27,16 +27,21 @@ public abstract class HttpTransportBase
 
     private string _typeName;
 
+    private readonly SentrySdk _sdk;
     /// <summary>
     /// Constructor for this class.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="options">The Sentry options.</param>
     /// <param name="getEnvironmentVariable">An optional method used to read environment variables.</param>
     /// <param name="clock">An optional system clock - used for testing.</param>
-    protected HttpTransportBase(SentryOptions options,
+    protected HttpTransportBase(
+        SentrySdk sdk,
+        SentryOptions options,
         Func<string, string?>? getEnvironmentVariable = default,
         ISystemClock? clock = default)
     {
+        _sdk = sdk;
         _options = options;
         _clock = clock ?? SystemClock.Clock;
         _getEnvironmentVariable = getEnvironmentVariable ?? options.SettingLocator.GetEnvironmentVariable;
@@ -90,7 +95,7 @@ public abstract class HttpTransportBase
             }
         }
 
-        return new Envelope(envelope.Header, envelopeItems);
+        return new Envelope(_sdk, envelope.Header, envelopeItems);
     }
 
     private void ProcessEnvelopeItem(DateTimeOffset now, EnvelopeItem item, List<EnvelopeItem> items)

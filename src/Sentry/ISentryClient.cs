@@ -8,6 +8,11 @@ namespace Sentry;
 public interface ISentryClient
 {
     /// <summary>
+    /// the Sentry sdk.
+    /// </summary>
+    public SentrySdk? Sdk { get; }
+
+    /// <summary>
     /// Whether the client is enabled or not.
     /// </summary>
     public bool IsEnabled { get; }

@@ -23,12 +23,15 @@ internal class BackgroundWorker : IBackgroundWorker, IDisposable
 
     public int QueuedItems => _queue.Count;
 
+    private readonly SentrySdk Sdk;
     public BackgroundWorker(
+        SentrySdk sdk,
         ITransport transport,
         SentryOptions options,
         CancellationTokenSource? shutdownSource = null,
         ConcurrentQueueLite<Envelope>? queue = null)
     {
+        Sdk = sdk;
         _transport = transport;
         _options = options;
         _queue = queue ?? new ConcurrentQueueLite<Envelope>();
@@ -300,7 +303,7 @@ internal class BackgroundWorker : IBackgroundWorker, IDisposable
         if (clientReport != null)
         {
             _options.LogDebug("Sending client report after flushing queue.");
-            using var envelope = Envelope.FromClientReport(clientReport);
+            using var envelope = Envelope.FromClientReport(Sdk, clientReport);
 
             try
             {

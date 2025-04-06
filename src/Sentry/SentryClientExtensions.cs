@@ -111,7 +111,7 @@ public static class SentryClientExtensions
         {
             SentryClient client => client.Options,
             Hub hub => hub.Options,
-            HubAdapter => SentrySdk.CurrentOptions,
+            HubAdapter => clientOrHub.Sdk?.CurrentOptions,
             _ => SentryOptionsForTestingOnly
         };
 }

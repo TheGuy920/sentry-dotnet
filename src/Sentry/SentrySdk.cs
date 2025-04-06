@@ -13,18 +13,26 @@ namespace Sentry;
 /// It allows safe static access to a client and scope management.
 /// When the SDK is uninitialized, calls to this class result in no-op so no callbacks are invoked.
 /// </remarks>
-public static partial class SentrySdk
+public partial class SentrySdk
 {
-    internal static IHub CurrentHub = DisabledHub.Instance;
+    private SentrySdk(){}
 
-    internal static SentryOptions? CurrentOptions => CurrentHub.GetSentryOptions();
+    /// <summary>
+    /// Creates a new instance of the Sentry SDK.
+    /// </summary>
+    /// <returns></returns>
+    public static SentrySdk New() => new();
+
+    internal IHub CurrentHub = DisabledHub.Instance;
+
+    internal SentryOptions? CurrentOptions => CurrentHub.GetSentryOptions();
 
     /// <summary>
     /// Last event id recorded in the current scope.
     /// </summary>
-    public static SentryId LastEventId { [DebuggerStepThrough] get => CurrentHub.LastEventId; }
+    public SentryId LastEventId { [DebuggerStepThrough] get => CurrentHub.LastEventId; }
 
-    internal static IHub InitHub(SentryOptions options)
+    internal static IHub InitHub(SentrySdk sdk, SentryOptions options)
     {
         options.SetupLogging();
 
@@ -57,26 +65,9 @@ public static partial class SentrySdk
 #pragma warning restore 0162
 #pragma warning restore CS0162 // Unreachable code detected
 
-        // Initialize native platform SDKs here
-        if (options.InitNativeSdks)
-        {
-#if __IOS__
-            InitSentryCocoaSdk(options);
-#elif ANDROID
-            InitSentryAndroidSdk(options);
-#elif NET8_0_OR_GREATER
-            // TODO: Is this working properly? Currently we don't have any way to check if the app is being compiled AOT
-            // All we know is whether trimming has been enabled or not. I think at the moment we'll be initialising
-            // SentryNative for managed applications when they've been trimmed!
-            if (SentryNative.IsAvailable)
-            {
-                InitNativeSdk(options);
-            }
-#endif
-        }
 
         // We init the hub after native SDK in case the native init needs to adapt some options.
-        var hub = new Hub(options);
+        var hub = new Hub(sdk, options);
 
         // Run all post-init callbacks set up by native integrations.
         foreach (var callback in options.PostInitCallbacks)
@@ -85,25 +76,10 @@ public static partial class SentrySdk
         }
         options.PostInitCallbacks.Clear();
 
-        // Platform specific check for profiler misconfiguration.
-#if __IOS__
-        // No user-facing warning necessary - the integration is part of InitSentryCocoaSdk().
-        Debug.Assert(options.IsProfilingEnabled == (options.TransactionProfilerFactory is not null));
-#elif ANDROID
-        LogWarningIfProfilingMisconfigured(options, " on Android");
-#else
-#if NET8_0_OR_GREATER
-        if (AotHelper.IsTrimmed)
-        {
-            LogWarningIfProfilingMisconfigured(options, " for NativeAOT");
-        }
-        else
-#endif
         {
             LogWarningIfProfilingMisconfigured(options, ", because ProfilingIntegration from package Sentry.Profiling" +
             " hasn't been registered. You can do that by calling 'options.AddProfilingIntegration()'");
         }
-#endif
 
         return hub;
     }
@@ -133,7 +109,7 @@ public static partial class SentrySdk
     /// <item>You are integrating Sentry into an environment that has custom application lifetime events.</item>
     /// </list>
     /// </remarks>
-    public static IDisposable Init() => Init((string?)null);
+    public IDisposable Init() => Init((string?)null);
 
     /// <summary>
     /// Initializes the SDK with the specified DSN.
@@ -154,7 +130,7 @@ public static partial class SentrySdk
     /// <item>You are integrating Sentry into an environment that has custom application lifetime events.</item>
     /// </list>
     /// </remarks>
-    public static IDisposable Init(string? dsn) => !Dsn.IsDisabled(dsn)
+    public IDisposable Init(string? dsn) => !Dsn.IsDisabled(dsn)
         ? Init(c => c.Dsn = dsn)
         : DisabledHub.Instance;
 
@@ -173,7 +149,7 @@ public static partial class SentrySdk
     /// <item>You are integrating Sentry into an environment that has custom application lifetime events.</item>
     /// </list>
     /// </remarks>
-    public static IDisposable Init(Action<SentryOptions>? configureOptions)
+    public IDisposable Init(Action<SentryOptions>? configureOptions)
     {
         var options = new SentryOptions();
         configureOptions?.Invoke(options);
@@ -200,9 +176,9 @@ public static partial class SentrySdk
     /// </list>
     /// </remarks>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static IDisposable Init(SentryOptions options) => UseHub(InitHub(options));
+    public IDisposable Init(SentryOptions options) => UseHub(InitHub(this, options));
 
-    internal static IDisposable UseHub(IHub hub)
+    internal IDisposable UseHub(IHub hub)
     {
         var oldHub = Interlocked.Exchange(ref CurrentHub, hub);
         (oldHub as IDisposable)?.Dispose();
@@ -212,7 +188,7 @@ public static partial class SentrySdk
     /// <summary>
     /// Allows to set the trace
     /// </summary>
-    internal static void SetTrace(SentryId traceId, SpanId parentSpanId) =>
+    internal void SetTrace(SentryId traceId, SpanId parentSpanId) =>
         CurrentHub.ConfigureScope(scope =>
             scope.SetPropagationContext(new SentryPropagationContext(traceId, parentSpanId)));
 
@@ -224,7 +200,7 @@ public static partial class SentrySdk
     /// Blocks synchronously. Prefer <see cref="FlushAsync()"/> in async code.
     /// </remarks>
     [DebuggerStepThrough]
-    public static void Flush() => CurrentHub.Flush();
+    public void Flush() => CurrentHub.Flush();
 
     /// <summary>
     /// Flushes the queue of captured events until the timeout is reached.
@@ -234,7 +210,7 @@ public static partial class SentrySdk
     /// Blocks synchronously. Prefer <see cref="FlushAsync(TimeSpan)"/> in async code.
     /// </remarks>
     [DebuggerStepThrough]
-    public static void Flush(TimeSpan timeout) => CurrentHub.Flush(timeout);
+    public void Flush(TimeSpan timeout) => CurrentHub.Flush(timeout);
 
     /// <summary>
     /// Flushes the queue of captured events until the timeout set in <see cref="SentryOptions.FlushTimeout"/>
@@ -242,7 +218,7 @@ public static partial class SentrySdk
     /// </summary>
     /// <returns>A task to await for the flush operation.</returns>
     [DebuggerStepThrough]
-    public static Task FlushAsync() => CurrentHub.FlushAsync();
+    public Task FlushAsync() => CurrentHub.FlushAsync();
 
     /// <summary>
     /// Flushes the queue of captured events until the timeout is reached.
@@ -250,7 +226,7 @@ public static partial class SentrySdk
     /// <param name="timeout">The amount of time allowed for flushing.</param>
     /// <returns>A task to await for the flush operation.</returns>
     [DebuggerStepThrough]
-    public static Task FlushAsync(TimeSpan timeout) => CurrentHub.FlushAsync(timeout);
+    public Task FlushAsync(TimeSpan timeout) => CurrentHub.FlushAsync(timeout);
 
     /// <summary>
     /// Close the SDK.
@@ -261,7 +237,7 @@ public static partial class SentrySdk
     /// Init returns a IDisposable that can be used to shutdown the SDK.
     /// </remarks>
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void Close()
+    public void Close()
     {
         var oldHub = Interlocked.Exchange(ref CurrentHub, DisabledHub.Instance);
         (oldHub as IDisposable)?.Dispose();
@@ -275,7 +251,7 @@ public static partial class SentrySdk
 
         public void Dispose()
         {
-            _ = Interlocked.CompareExchange(ref CurrentHub, DisabledHub.Instance, _localHub);
+            // _ = Interlocked.CompareExchange(ref CurrentHub, DisabledHub.Instance, _localHub);
             (_localHub as IDisposable)?.Dispose();
             _localHub = null!;
         }
@@ -284,7 +260,7 @@ public static partial class SentrySdk
     /// <summary>
     /// Whether the SDK is enabled or not.
     /// </summary>
-    public static bool IsEnabled { [DebuggerStepThrough] get => CurrentHub.IsEnabled; }
+    public bool IsEnabled { [DebuggerStepThrough] get => CurrentHub.IsEnabled; }
 
     /// <summary>
     /// Creates a new scope that will terminate when disposed.
@@ -295,21 +271,21 @@ public static partial class SentrySdk
     /// <param name="state">A state object to be added to the scope.</param>
     /// <returns>A disposable that when disposed, ends the created scope.</returns>
     [DebuggerStepThrough]
-    public static IDisposable PushScope<TState>(TState state) => CurrentHub.PushScope(state);
+    public IDisposable PushScope<TState>(TState state) => CurrentHub.PushScope(state);
 
     /// <summary>
     /// Creates a new scope that will terminate when disposed.
     /// </summary>
     /// <returns>A disposable that when disposed, ends the created scope.</returns>
     [DebuggerStepThrough]
-    public static IDisposable PushScope() => CurrentHub.PushScope();
+    public IDisposable PushScope() => CurrentHub.PushScope();
 
     /// <summary>
     /// Binds the client to the current scope.
     /// </summary>
     /// <param name="client">The client.</param>
     [DebuggerStepThrough]
-    public static void BindClient(ISentryClient client) => CurrentHub.BindClient(client);
+    public void BindClient(ISentryClient client) => CurrentHub.BindClient(client);
 
     /// <summary>
     /// Adds a breadcrumb to the current Scope.
@@ -336,7 +312,7 @@ public static partial class SentrySdk
     /// <param name="level">Breadcrumb level.</param>
     /// <seealso href="https://develop.sentry.dev/sdk/event-payloads/breadcrumbs/"/>
     [DebuggerStepThrough]
-    public static void AddBreadcrumb(
+    public void AddBreadcrumb(
         string message,
         string? category = null,
         string? type = null,
@@ -359,7 +335,7 @@ public static partial class SentrySdk
     /// <param name="level">The level.</param>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void AddBreadcrumb(
+    public void AddBreadcrumb(
         ISystemClock? clock,
         string message,
         string? category = null,
@@ -375,7 +351,7 @@ public static partial class SentrySdk
     /// <param name="hint">A hint providing additional context that can be used in the BeforeBreadcrumb callback</param>
     /// <see cref="AddBreadcrumb(string, string?, string?, IDictionary{string, string}?, BreadcrumbLevel)"/>
     [DebuggerStepThrough]
-    public static void AddBreadcrumb(Breadcrumb breadcrumb, SentryHint? hint = null)
+    public void AddBreadcrumb(Breadcrumb breadcrumb, SentryHint? hint = null)
         => CurrentHub.AddBreadcrumb(breadcrumb, hint);
 
     /// <summary>
@@ -383,7 +359,7 @@ public static partial class SentrySdk
     /// </summary>
     /// <param name="configureScope">The configure scope callback.</param>
     [DebuggerStepThrough]
-    public static void ConfigureScope(Action<Scope> configureScope)
+    public void ConfigureScope(Action<Scope> configureScope)
         => CurrentHub.ConfigureScope(configureScope);
 
     /// <summary>
@@ -392,13 +368,13 @@ public static partial class SentrySdk
     /// <param name="configureScope">The configure scope callback.</param>
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
-    public static Task ConfigureScopeAsync(Func<Scope, Task> configureScope)
+    public Task ConfigureScopeAsync(Func<Scope, Task> configureScope)
         => CurrentHub.ConfigureScopeAsync(configureScope);
 
     /// <inheritdoc cref="ISentryClient.CaptureEnvelope"/>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static bool CaptureEnvelope(Envelope envelope)
+    public bool CaptureEnvelope(Envelope envelope)
         => CurrentHub.CaptureEnvelope(envelope);
 
     /// <summary>
@@ -410,7 +386,7 @@ public static partial class SentrySdk
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SentryId CaptureEvent(SentryEvent evt, Scope? scope = null, SentryHint? hint = null)
+    public SentryId CaptureEvent(SentryEvent evt, Scope? scope = null, SentryHint? hint = null)
         => CurrentHub.CaptureEvent(evt, scope, hint);
 
     /// <summary>
@@ -424,7 +400,7 @@ public static partial class SentrySdk
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SentryId CaptureEvent(SentryEvent evt, Action<Scope> configureScope)
+    public SentryId CaptureEvent(SentryEvent evt, Action<Scope> configureScope)
         => CurrentHub.CaptureEvent(evt, null, configureScope);
 
     /// <summary>
@@ -439,7 +415,7 @@ public static partial class SentrySdk
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static SentryId CaptureEvent(SentryEvent evt, SentryHint? hint, Action<Scope> configureScope)
+    public SentryId CaptureEvent(SentryEvent evt, SentryHint? hint, Action<Scope> configureScope)
         => CurrentHub.CaptureEvent(evt, hint, configureScope);
 
     /// <summary>
@@ -448,7 +424,7 @@ public static partial class SentrySdk
     /// <param name="exception">The exception.</param>
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
-    public static SentryId CaptureException(Exception exception)
+    public SentryId CaptureException(Exception exception)
         => CurrentHub.CaptureException(exception);
 
     /// <summary>
@@ -461,7 +437,7 @@ public static partial class SentrySdk
     /// <param name="configureScope">The callback to configure the scope.</param>
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
-    public static SentryId CaptureException(Exception exception, Action<Scope> configureScope)
+    public SentryId CaptureException(Exception exception, Action<Scope> configureScope)
         => CurrentHub.CaptureException(exception, configureScope);
 
     /// <summary>
@@ -471,7 +447,7 @@ public static partial class SentrySdk
     /// <param name="level">The message level.</param>
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
-    public static SentryId CaptureMessage(string message, SentryLevel level = SentryLevel.Info)
+    public SentryId CaptureMessage(string message, SentryLevel level = SentryLevel.Info)
         => CurrentHub.CaptureMessage(message, level);
 
     /// <summary>
@@ -485,21 +461,21 @@ public static partial class SentrySdk
     /// <param name="level">The message level.</param>
     /// <returns>The Id of the event.</returns>
     [DebuggerStepThrough]
-    public static SentryId CaptureMessage(string message, Action<Scope> configureScope, SentryLevel level = SentryLevel.Info)
+    public SentryId CaptureMessage(string message, Action<Scope> configureScope, SentryLevel level = SentryLevel.Info)
         => CurrentHub.CaptureMessage(message, configureScope, level);
 
     /// <summary>
     /// Captures feedback from the user.
     /// </summary>
     [DebuggerStepThrough]
-    public static void CaptureFeedback(SentryFeedback feedback, Scope? scope = null, SentryHint? hint = null)
+    public void CaptureFeedback(SentryFeedback feedback, Scope? scope = null, SentryHint? hint = null)
         => CurrentHub.CaptureFeedback(feedback, scope, hint);
 
     /// <summary>
     /// Captures feedback from the user.
     /// </summary>
     [DebuggerStepThrough]
-    public static void CaptureFeedback(string message, string? contactEmail = null, string? name = null,
+    public void CaptureFeedback(string message, string? contactEmail = null, string? name = null,
         string? replayId = null, string? url = null, SentryId? associatedEventId = null, Scope? scope = null,
         SentryHint? hint = null)
         => CurrentHub.CaptureFeedback(new SentryFeedback(message, contactEmail, name, replayId, url, associatedEventId),
@@ -511,7 +487,7 @@ public static partial class SentrySdk
     /// <param name="userFeedback">The user feedback to send to Sentry.</param>
     [DebuggerStepThrough]
     [Obsolete("Use CaptureFeedback instead.")]
-    public static void CaptureUserFeedback(UserFeedback userFeedback)
+    public void CaptureUserFeedback(UserFeedback userFeedback)
         => CurrentHub.CaptureUserFeedback(userFeedback);
 
     /// <summary>
@@ -523,7 +499,7 @@ public static partial class SentrySdk
     /// <param name="name">The optional username.</param>
     [DebuggerStepThrough]
     [Obsolete("Use CaptureFeedback instead.")]
-    public static void CaptureUserFeedback(SentryId eventId, string email, string comments, string? name = null)
+    public void CaptureUserFeedback(SentryId eventId, string email, string comments, string? name = null)
         => CurrentHub.CaptureUserFeedback(new UserFeedback(eventId, name, email, comments));
 
     /// <summary>
@@ -535,7 +511,7 @@ public static partial class SentrySdk
     /// </remarks>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void CaptureTransaction(SentryTransaction transaction)
+    public void CaptureTransaction(SentryTransaction transaction)
         => CurrentHub.CaptureTransaction(transaction);
 
     /// <summary>
@@ -547,14 +523,14 @@ public static partial class SentrySdk
     /// </remarks>
     [DebuggerStepThrough]
     [EditorBrowsable(EditorBrowsableState.Never)]
-    public static void CaptureTransaction(SentryTransaction transaction, Scope? scope, SentryHint? hint)
+    public void CaptureTransaction(SentryTransaction transaction, Scope? scope, SentryHint? hint)
         => CurrentHub.CaptureTransaction(transaction, scope, hint);
 
     /// <summary>
     /// Captures a session update.
     /// </summary>
     [DebuggerStepThrough]
-    public static void CaptureSession(SessionUpdate sessionUpdate)
+    public void CaptureSession(SessionUpdate sessionUpdate)
         => CurrentHub.CaptureSession(sessionUpdate);
 
     /// <summary>
@@ -572,7 +548,7 @@ public static partial class SentrySdk
     /// <param name="configureMonitorOptions">The optional monitor config used to create a Check-In programmatically.</param>
     /// <returns>The ID of the check-in.</returns>
     [DebuggerStepThrough]
-    public static SentryId CaptureCheckIn(string monitorSlug,
+    public SentryId CaptureCheckIn(string monitorSlug,
         CheckInStatus status,
         SentryId? sentryId = null,
         TimeSpan? duration = null,
@@ -590,7 +566,7 @@ public static partial class SentrySdk
     /// Starts a transaction.
     /// </summary>
     [DebuggerStepThrough]
-    public static ITransactionTracer StartTransaction(
+    public ITransactionTracer StartTransaction(
         ITransactionContext context,
         IReadOnlyDictionary<string, object?> customSamplingContext)
         => CurrentHub.StartTransaction(context, customSamplingContext);
@@ -599,7 +575,7 @@ public static partial class SentrySdk
     /// Starts a transaction.
     /// </summary>
     [DebuggerStepThrough]
-    internal static ITransactionTracer StartTransaction(
+    internal ITransactionTracer StartTransaction(
         ITransactionContext context,
         IReadOnlyDictionary<string, object?> customSamplingContext,
         DynamicSamplingContext? dynamicSamplingContext)
@@ -609,28 +585,28 @@ public static partial class SentrySdk
     /// Starts a transaction.
     /// </summary>
     [DebuggerStepThrough]
-    public static ITransactionTracer StartTransaction(ITransactionContext context)
+    public ITransactionTracer StartTransaction(ITransactionContext context)
         => CurrentHub.StartTransaction(context);
 
     /// <summary>
     /// Starts a transaction.
     /// </summary>
     [DebuggerStepThrough]
-    public static ITransactionTracer StartTransaction(string name, string operation)
+    public ITransactionTracer StartTransaction(string name, string operation)
         => CurrentHub.StartTransaction(name, operation);
 
     /// <summary>
     /// Starts a transaction.
     /// </summary>
     [DebuggerStepThrough]
-    public static ITransactionTracer StartTransaction(string name, string operation, string? description)
+    public ITransactionTracer StartTransaction(string name, string operation, string? description)
         => CurrentHub.StartTransaction(name, operation, description);
 
     /// <summary>
     /// Starts a transaction.
     /// </summary>
     [DebuggerStepThrough]
-    public static ITransactionTracer StartTransaction(string name, string operation, SentryTraceHeader traceHeader)
+    public ITransactionTracer StartTransaction(string name, string operation, SentryTraceHeader traceHeader)
         => CurrentHub.StartTransaction(name, operation, traceHeader);
 
     /// <summary>
@@ -640,28 +616,28 @@ public static partial class SentrySdk
     /// This method is used internally and is not meant for public use.
     /// </remarks>
     [DebuggerStepThrough]
-    public static void BindException(Exception exception, ISpan span)
+    public void BindException(Exception exception, ISpan span)
         => CurrentHub.BindException(exception, span);
 
     /// <summary>
     /// Gets the last active span.
     /// </summary>
     [DebuggerStepThrough]
-    public static ISpan? GetSpan()
+    public ISpan? GetSpan()
         => CurrentHub.GetSpan();
 
     /// <summary>
     /// Gets the Sentry trace header of the parent that allows tracing across services
     /// </summary>
     [DebuggerStepThrough]
-    public static SentryTraceHeader? GetTraceHeader()
+    public SentryTraceHeader? GetTraceHeader()
         => CurrentHub.GetTraceHeader();
 
     /// <summary>
     /// Gets the Sentry "baggage" header that allows tracing across services
     /// </summary>
     [DebuggerStepThrough]
-    public static BaggageHeader? GetBaggage()
+    public BaggageHeader? GetBaggage()
         => CurrentHub.GetBaggage();
 
     /// <summary>
@@ -671,7 +647,7 @@ public static partial class SentrySdk
     /// If no "sentry-trace" header is provided a random trace ID and span ID is created.
     /// </remarks>
     [DebuggerStepThrough]
-    public static TransactionContext ContinueTrace(
+    public TransactionContext ContinueTrace(
         string? traceHeader,
         string? baggageHeader,
         string? name = null,
@@ -685,7 +661,7 @@ public static partial class SentrySdk
     /// If no "sentry-trace" header is provided a random trace ID and span ID is created.
     /// </remarks>
     [DebuggerStepThrough]
-    public static TransactionContext ContinueTrace(
+    public TransactionContext ContinueTrace(
         SentryTraceHeader? traceHeader,
         BaggageHeader? baggageHeader,
         string? name = null,
@@ -694,22 +670,22 @@ public static partial class SentrySdk
 
     /// <inheritdoc cref="IHub.StartSession"/>
     [DebuggerStepThrough]
-    public static void StartSession()
+    public void StartSession()
         => CurrentHub.StartSession();
 
     /// <inheritdoc cref="IHub.EndSession"/>
     [DebuggerStepThrough]
-    public static void EndSession(SessionEndStatus status = SessionEndStatus.Exited)
+    public void EndSession(SessionEndStatus status = SessionEndStatus.Exited)
         => CurrentHub.EndSession(status);
 
     /// <inheritdoc cref="IHub.PauseSession"/>
     [DebuggerStepThrough]
-    public static void PauseSession()
+    public void PauseSession()
         => CurrentHub.PauseSession();
 
     /// <inheritdoc cref="IHub.ResumeSession"/>
     [DebuggerStepThrough]
-    public static void ResumeSession()
+    public void ResumeSession()
         => CurrentHub.ResumeSession();
 
     /// <summary>
@@ -720,7 +696,7 @@ public static partial class SentrySdk
     /// We do not intend to remove it.
     /// </remarks>
     [Obsolete("WARNING: This method deliberately causes a crash, and should not be used in a real application.")]
-    public static void CauseCrash(CrashType crashType)
+    public void CauseCrash(CrashType crashType)
     {
         var info = $"{nameof(SentrySdk)}.{nameof(CauseCrash)}({nameof(CrashType)}.{crashType})";
         var msg = $"This exception was caused deliberately by {info}.";
@@ -735,55 +711,9 @@ public static partial class SentrySdk
                 var thread = new Thread(() => throw new ApplicationException(msg));
                 thread.Start();
                 break;
-
-#if ANDROID
-            case CrashType.Java:
-                JavaSdk.Android.Supplemental.Buggy.ThrowRuntimeException(msg);
-                break;
-
-            case CrashType.JavaBackgroundThread:
-                JavaSdk.Android.Supplemental.Buggy.ThrowRuntimeExceptionOnBackgroundThread(msg);
-                break;
-
-            case CrashType.Native:
-                NativeCrash();
-                break;
-#elif __IOS__
-            case CrashType.Native:
-                SentryCocoaSdk.Crash();
-                break;
-#elif NET8_0_OR_GREATER
-            case CrashType.Native:
-                if (!SentryNative.IsAvailable)
-                {
-                    CurrentOptions?.LogError("The support for capturing native crashes is limited to AOT compilation on platforms with SentryNative support.");
-                    return;
-                }
-
-                if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-                {
-                    NativeStrlenMSVCRT(IntPtr.Zero);
-                }
-                else
-                {
-                    NativeStrlenLibC(IntPtr.Zero);
-                }
-                break;
-#endif
             default:
                 throw new ArgumentOutOfRangeException(nameof(crashType), crashType, null);
         }
         CurrentOptions?.LogWarning("Something went wrong in {0}, execution should never reach this.", info);
     }
-
-#if ANDROID
-    [System.Runtime.InteropServices.DllImport("libsentrysupplemental.so", EntryPoint = "crash")]
-    private static extern void NativeCrash();
-#elif NET8_0_OR_GREATER
-    [DllImport("msvcrt", EntryPoint = "strlen")]
-    private static extern IntPtr NativeStrlenMSVCRT(IntPtr str);
-
-    [DllImport("libc", EntryPoint = "strlen")]
-    private static extern IntPtr NativeStrlenLibC(IntPtr strt);
-#endif
 }

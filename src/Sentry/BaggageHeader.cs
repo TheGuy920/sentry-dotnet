@@ -13,7 +13,8 @@ public class BaggageHeader
     internal const string HttpHeaderName = "baggage";
     internal const string SentryKeyPrefix = "sentry-";
 
-    internal static IDiagnosticLogger? Logger { get; set; } = SentrySdk.CurrentOptions?.DiagnosticLogger;
+    internal IDiagnosticLogger? Logger { get; }
+    private static IDiagnosticLogger? DLogger { get; set; }
 
     // https://www.w3.org/TR/baggage/#baggage-string
     // "Uniqueness of keys between multiple list-members in a baggage-string is not guaranteed."
@@ -21,8 +22,15 @@ public class BaggageHeader
 
     internal IReadOnlyList<KeyValuePair<string, string>> Members { get; }
 
-    private BaggageHeader(IEnumerable<KeyValuePair<string, string>> members) =>
+    private readonly SentrySdk _sdk;
+    private BaggageHeader(SentrySdk sdk, IEnumerable<KeyValuePair<string, string>> members)
+    {
+        _sdk = sdk;
+        Logger = sdk.CurrentOptions?.DiagnosticLogger;
         Members = members.ToList();
+
+        DLogger ??= Logger;
+    }
 
     // We can safely return a dictionary of Sentry members, as we are in control over the keys added.
     // Just to be safe though, we'll group by key and only take the first of each one.
@@ -51,6 +59,7 @@ public class BaggageHeader
     /// <summary>
     /// Parses a baggage header string.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="baggage">The string to parse.</param>
     /// <param name="onlySentry">
     /// When <c>false</c>, the resulting object includes all list members present in the baggage header string.
@@ -59,7 +68,7 @@ public class BaggageHeader
     /// <returns>
     /// An object representing the members baggage header, or <c>null</c> if there are no members parsed.
     /// </returns>
-    internal static BaggageHeader? TryParse(string baggage, bool onlySentry = false)
+    internal static BaggageHeader? TryParse(SentrySdk sdk, string baggage, bool onlySentry = false)
     {
         // Example from W3C baggage spec:
         // "key1=value1;property1;property2, key2 = value2, key3=value3; propertyKey=propertyValue"
@@ -73,7 +82,7 @@ public class BaggageHeader
             var parts = item.Split('=', 2);
             if (parts.Length != 2)
             {
-                Logger?.LogWarning(
+                DLogger?.LogWarning(
                     "The baggage header has an item without a '=' separator, and it will be discarded. " +
                     "The item is: \"{0}\"", item);
                 continue;
@@ -82,7 +91,7 @@ public class BaggageHeader
             var key = parts[0].Trim();
             if (key.Length == 0)
             {
-                Logger?.LogWarning(
+                DLogger?.LogWarning(
                     "The baggage header has an item with an empty key, and it will be discarded. " +
                     "The item is: \"{0}\"", item);
                 continue;
@@ -91,7 +100,7 @@ public class BaggageHeader
             var value = parts[1].Trim();
             if (value.Length == 0)
             {
-                Logger?.LogWarning(
+                DLogger?.LogWarning(
                     "The baggage header has an item with an empty value, and it will be discarded. " +
                     "The item is: \"{0}\"", item);
                 continue;
@@ -104,10 +113,11 @@ public class BaggageHeader
             }
         }
 
-        return members.Count == 0 ? null : new BaggageHeader(members);
+        return members.Count == 0 ? null : new BaggageHeader(sdk, members);
     }
 
     internal static BaggageHeader Create(
+        SentrySdk sdk,
         IEnumerable<KeyValuePair<string, string>> items,
         bool useSentryPrefix = false)
     {
@@ -118,11 +128,11 @@ public class BaggageHeader
             members = members.Select(kvp => new KeyValuePair<string, string>(SentryKeyPrefix + kvp.Key, kvp.Value));
         }
 
-        return new BaggageHeader(members);
+        return new BaggageHeader(sdk, members);
     }
 
-    internal static BaggageHeader Merge(IEnumerable<BaggageHeader> baggageHeaders) =>
-        new(baggageHeaders.SelectMany(x => x.Members));
+    internal static BaggageHeader Merge(SentrySdk sdk, IEnumerable<BaggageHeader> baggageHeaders) =>
+        new(sdk,baggageHeaders.SelectMany(x => x.Members));
 
     private static bool IsValidKey(string? key)
     {

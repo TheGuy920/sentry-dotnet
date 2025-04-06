@@ -181,4 +181,10 @@
     <InternalsVisibleTo Include="Sentry.Analyzers.Tests" PublicKey="$(SentryPublicKey)" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>..\..\..\..\..\..\..\.config\r2modmanPlus-local\REPO\profiles\Default\BepInEx\core\0Harmony.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

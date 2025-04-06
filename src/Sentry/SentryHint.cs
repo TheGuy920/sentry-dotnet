@@ -13,7 +13,7 @@ public class SentryHint
     /// <summary>
     /// Creates a new instance of <see cref="SentryHint"/>.
     /// </summary>
-    public SentryHint() : this(SentrySdk.CurrentHub.GetSentryOptions())
+    public SentryHint(SentrySdk sdk) : this(sdk.CurrentHub.GetSentryOptions())
     {
     }
 
@@ -25,10 +25,11 @@ public class SentryHint
     /// <summary>
     /// Creates a new hint containing a single item.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="key">The key of the hint item.</param>
     /// <param name="value">The value of the hint item.</param>
-    public SentryHint(string key, object? value)
-        : this()
+    public SentryHint(SentrySdk sdk, string key, object? value)
+        : this(sdk)
     {
         Items[key] = value;
     }
@@ -104,18 +105,20 @@ public class SentryHint
     /// <summary>
     /// Creates a new Hint with one or more attachments.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="attachments">The attachment(s) to add.</param>
     /// <returns>A Hint having the attachment(s).</returns>
-    public static SentryHint WithAttachments(params SentryAttachment[] attachments) => WithAttachments(attachments.AsEnumerable());
+    public static SentryHint WithAttachments(SentrySdk sdk, params SentryAttachment[] attachments) => WithAttachments(sdk, attachments.AsEnumerable());
 
     /// <summary>
     /// Creates a new Hint with attachments.
     /// </summary>
+    /// <param name="sdk"></param>
     /// <param name="attachments">The attachments to add.</param>
     /// <returns>A Hint having the attachments.</returns>
-    public static SentryHint WithAttachments(IEnumerable<SentryAttachment> attachments)
+    public static SentryHint WithAttachments(SentrySdk sdk, IEnumerable<SentryAttachment> attachments)
     {
-        var hint = new SentryHint();
+        var hint = new SentryHint(sdk);
         hint._attachments.AddRange(attachments);
         return hint;
     }

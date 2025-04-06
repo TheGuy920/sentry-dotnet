@@ -26,6 +26,7 @@ internal class Hub : IHub, IDisposable
     internal IInternalScopeManager ScopeManager { get; }
 
     private int _isEnabled = 1;
+    public SentrySdk? Sdk { get; private set; }
     public bool IsEnabled => _isEnabled == 1;
 
     internal SentryOptions Options => _options;
@@ -34,6 +35,7 @@ internal class Hub : IHub, IDisposable
     private ISentryClient CurrentClient => ScopeManager.GetCurrent().Value;
 
     internal Hub(
+        SentrySdk sdk,
         SentryOptions options,
         ISentryClient? client = null,
         ISessionManager? sessionManager = null,
@@ -41,6 +43,8 @@ internal class Hub : IHub, IDisposable
         IInternalScopeManager? scopeManager = null,
         RandomValuesFactory? randomValuesFactory = null)
     {
+        Sdk = sdk;
+
         if (string.IsNullOrWhiteSpace(options.Dsn))
         {
             const string msg = "Attempt to instantiate a Hub without a DSN.";
@@ -54,9 +58,9 @@ internal class Hub : IHub, IDisposable
         _randomValuesFactory = randomValuesFactory ?? new SynchronizedRandomValuesFactory();
         _sessionManager = sessionManager ?? new GlobalSessionManager(options);
         _clock = clock ?? SystemClock.Clock;
-        client ??= new SentryClient(options, randomValuesFactory: _randomValuesFactory, sessionManager: _sessionManager);
+        client ??= new SentryClient(Sdk, options, randomValuesFactory: _randomValuesFactory, sessionManager: _sessionManager);
 
-        ScopeManager = scopeManager ?? new SentryScopeManager(options, client);
+        ScopeManager = scopeManager ?? new SentryScopeManager(Sdk, options, client);
 
         if (!options.IsGlobalModeEnabled)
         {
@@ -206,11 +210,11 @@ internal class Hub : IHub, IDisposable
         var span = GetSpan();
         if (span?.GetTransaction() is TransactionTracer { DynamicSamplingContext: { IsEmpty: false } dsc })
         {
-            return dsc.ToBaggageHeader();
+            return dsc.ToBaggageHeader(Sdk!);
         }
 
         var propagationContext = CurrentScope.PropagationContext;
-        return propagationContext.GetOrCreateDynamicSamplingContext(_options).ToBaggageHeader();
+        return propagationContext.GetOrCreateDynamicSamplingContext(_options).ToBaggageHeader(Sdk!);
     }
 
     public TransactionContext ContinueTrace(
@@ -228,7 +232,7 @@ internal class Hub : IHub, IDisposable
         BaggageHeader? sentryBaggageHeader = null;
         if (baggageHeader is not null)
         {
-            sentryBaggageHeader = BaggageHeader.TryParse(baggageHeader, onlySentry: true);
+            sentryBaggageHeader = BaggageHeader.TryParse(Sdk!, baggageHeader, onlySentry: true);
         }
 
         return ContinueTrace(sentryTraceHeader, sentryBaggageHeader, name, operation);
@@ -584,7 +588,7 @@ internal class Hub : IHub, IDisposable
         {
             enumerable = metrics as Metric[] ?? metrics.ToArray();
             _options.LogDebug("Capturing metrics.");
-            CurrentClient.CaptureEnvelope(Envelope.FromMetrics(metrics));
+            CurrentClient.CaptureEnvelope(Envelope.FromMetrics(Sdk!, metrics));
         }
         catch (Exception e)
         {
@@ -603,7 +607,7 @@ internal class Hub : IHub, IDisposable
         try
         {
             _options.LogDebug("Capturing code locations for period: {0}", codeLocations.Timestamp);
-            CurrentClient.CaptureEnvelope(Envelope.FromCodeLocations(codeLocations));
+            CurrentClient.CaptureEnvelope(Envelope.FromCodeLocations(Sdk!, codeLocations));
         }
         catch (Exception e)
         {

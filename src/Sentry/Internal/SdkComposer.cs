@@ -18,12 +18,12 @@ internal class SdkComposer
         }
     }
 
-    private ITransport CreateTransport()
+    private ITransport CreateTransport(SentrySdk sdk)
     {
         _options.LogDebug("Creating transport.");
 
         // Start from either the transport given on options, or create a new HTTP transport.
-        var transport = _options.Transport ?? new LazyHttpTransport(_options);
+        var transport = _options.Transport ?? new LazyHttpTransport(sdk, _options);
 
         // When a cache directory path is given, wrap the transport in a caching transport.
         if (!string.IsNullOrWhiteSpace(_options.CacheDirectoryPath))
@@ -37,7 +37,7 @@ internal class SdkComposer
             else
             {
                 _options.LogDebug("File writing is enabled, wrapping transport in caching transport.");
-                transport = CachingTransport.Create(transport, _options);
+                transport = CachingTransport.Create(sdk, transport, _options);
             }
         }
         else
@@ -66,7 +66,7 @@ internal class SdkComposer
             {
                 throw new InvalidOperationException("Invalid option for SpotlightUrl: " + _options.SpotlightUrl);
             }
-            transport = new SpotlightHttpTransport(transport, _options, _options.GetHttpClient(), spotlightUrl, SystemClock.Clock);
+            transport = new SpotlightHttpTransport(sdk, transport, _options, _options.GetHttpClient(), spotlightUrl, SystemClock.Clock);
         }
 
         // Always persist the transport on the options, so other places can pick it up where necessary.
@@ -75,7 +75,7 @@ internal class SdkComposer
         return transport;
     }
 
-    public IBackgroundWorker CreateBackgroundWorker()
+    public IBackgroundWorker CreateBackgroundWorker(SentrySdk sdk)
     {
         if (_options.BackgroundWorker is { } worker)
         {
@@ -85,8 +85,8 @@ internal class SdkComposer
             return worker;
         }
 
-        var transport = CreateTransport();
+        var transport = CreateTransport(sdk);
 
-        return new BackgroundWorker(transport, _options);
+        return new BackgroundWorker(sdk, transport, _options);
     }
 }

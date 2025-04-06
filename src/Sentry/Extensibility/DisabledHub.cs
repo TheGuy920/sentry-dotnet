@@ -15,6 +15,11 @@ public class DisabledHub : IHub, IDisposable
     public static readonly DisabledHub Instance = new();
 
     /// <summary>
+    /// Null.
+    /// </summary>
+    public SentrySdk? Sdk { get; } = null;
+
+    /// <summary>
     /// Always disabled.
     /// </summary>
     public bool IsEnabled => false;
