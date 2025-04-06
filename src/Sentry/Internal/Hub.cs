@@ -60,20 +60,6 @@ internal class Hub : IHub, IDisposable
             PushScope();
         }
 
-#if MEMORY_DUMP_SUPPORTED
-        if (options.HeapDumpOptions is not null)
-        {
-            if (_options.DisableFileWrite)
-            {
-                _options.LogError("Automatic Heap Dumps cannot be used with file write disabled.");
-            }
-            else
-            {
-                _memoryMonitor = new MemoryMonitor(options, CaptureHeapDump);
-            }
-        }
-#endif
-
         foreach (var integration in options.Integrations)
         {
             options.LogDebug("Registering integration: '{0}'.", integration.GetType().Name);
@@ -696,10 +682,6 @@ internal class Hub : IHub, IDisposable
             return;
         }
 
-#if MEMORY_DUMP_SUPPORTED
-        _memoryMonitor?.Dispose();
-#endif
-
         try
         {
             CurrentClient.FlushAsync(_options.ShutdownTimeout).ConfigureAwait(false).GetAwaiter().GetResult();
@@ -709,18 +691,6 @@ internal class Hub : IHub, IDisposable
             _options.LogError(e, "Failed to wait on disposing tasks to flush.");
         }
         //Don't dispose of ScopeManager since we want dangling transactions to still be able to access tags.
-
-#if __IOS__
-            // TODO
-#elif ANDROID
-            // TODO
-#elif NET8_0_OR_GREATER
-        if (SentryNative.IsAvailable)
-        {
-            _options?.LogDebug("Closing native SDK");
-            SentrySdk.CloseNativeSdk();
-        }
-#endif
     }
 
     public SentryId LastEventId => CurrentScope.LastEventId;

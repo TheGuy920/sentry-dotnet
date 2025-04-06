@@ -105,7 +105,7 @@ public sealed class Envelope : ISerializable, IDisposable
 
         var writer = new JsonTextWriter(new StreamWriter(stream));
 
-        // await using (writer.ConfigureAwait(false))
+        using (writer)
         {
             writer.WriteDictionaryValue(headerItems, logger);
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
