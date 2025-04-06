@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Infrastructure;
 using Sentry.Internal;
@@ -102,13 +103,9 @@ public sealed class Envelope : ISerializable, IDisposable
             ? Header.Append("sent_at", clock.GetUtcNow())
             : Header;
 
-        var writer = new Utf8JsonWriter(stream);
+        var writer = new JsonTextWriter(new StreamWriter(stream));
 
-#if NETFRAMEWORK || NETSTANDARD2_0
-        await using (writer)
-#else
-        await using (writer.ConfigureAwait(false))
-#endif
+        // await using (writer.ConfigureAwait(false))
         {
             writer.WriteDictionaryValue(headerItems, logger);
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -122,7 +119,7 @@ public sealed class Envelope : ISerializable, IDisposable
             ? Header.Append("sent_at", clock.GetUtcNow())
             : Header;
 
-        using var writer = new Utf8JsonWriter(stream);
+        using var writer = new JsonTextWriter(new StreamWriter(stream));
         writer.WriteDictionaryValue(headerItems, logger);
         writer.Flush();
     }

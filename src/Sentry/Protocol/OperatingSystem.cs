@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -94,17 +96,48 @@ public sealed class OperatingSystem : ISentryJsonSerializable, ICloneable<Operat
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", Type);
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteStringIfNotWhiteSpace("version", Version);
-        writer.WriteStringIfNotWhiteSpace("raw_description", RawDescription);
-        writer.WriteStringIfNotWhiteSpace("build", Build);
-        writer.WriteStringIfNotWhiteSpace("kernel_version", KernelVersion);
-        writer.WriteBooleanIfNotNull("rooted", Rooted);
+        writer.WritePropertyName("type");
+        writer.WriteValue(Type);
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("name");
+            writer.WriteValue(Name);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Version))
+        {
+            writer.WritePropertyName("version");
+            writer.WriteValue(Version);
+        }
+
+        if (!string.IsNullOrWhiteSpace(RawDescription))
+        {
+            writer.WritePropertyName("raw_description");
+            writer.WriteValue(RawDescription);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Build))
+        {
+            writer.WritePropertyName("build");
+            writer.WriteValue(Build);
+        }
+
+        if (!string.IsNullOrWhiteSpace(KernelVersion))
+        {
+            writer.WritePropertyName("kernel_version");
+            writer.WriteValue(KernelVersion);
+        }
+
+        if (Rooted.HasValue)
+        {
+            writer.WritePropertyName("rooted");
+            writer.WriteValue(Rooted.Value);
+        }
 
         writer.WriteEndObject();
     }
@@ -112,14 +145,14 @@ public sealed class OperatingSystem : ISentryJsonSerializable, ICloneable<Operat
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static OperatingSystem FromJson(JsonElement json)
+    public static OperatingSystem FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var version = json.GetPropertyOrNull("version")?.GetString();
-        var rawDescription = json.GetPropertyOrNull("raw_description")?.GetString();
-        var build = json.GetPropertyOrNull("build")?.GetString();
-        var kernelVersion = json.GetPropertyOrNull("kernel_version")?.GetString();
-        var rooted = json.GetPropertyOrNull("rooted")?.GetBoolean();
+        var name = json["name"]?.Value<string>();
+        var version = json["version"]?.Value<string>();
+        var rawDescription = json["raw_description"]?.Value<string>();
+        var build = json["build"]?.Value<string>();
+        var kernelVersion = json["kernel_version"]?.Value<string>();
+        var rooted = json["rooted"]?.Value<bool?>();
 
         return new OperatingSystem
         {

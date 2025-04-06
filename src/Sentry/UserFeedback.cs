@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -41,14 +43,30 @@ public sealed class UserFeedback : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteSerializable("event_id", EventId, logger);
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteStringIfNotWhiteSpace("email", Email);
-        writer.WriteStringIfNotWhiteSpace("comments", Comments);
+        writer.WritePropertyName("event_id");
+        writer.WriteValue(EventId.ToString());
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("name");
+            writer.WriteValue(Name);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Email))
+        {
+            writer.WritePropertyName("email");
+            writer.WriteValue(Email);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Comments))
+        {
+            writer.WritePropertyName("comments");
+            writer.WriteValue(Comments);
+        }
 
         writer.WriteEndObject();
     }
@@ -56,12 +74,12 @@ public sealed class UserFeedback : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static UserFeedback FromJson(JsonElement json)
+    public static UserFeedback FromJson(JToken json)
     {
-        var eventId = json.GetPropertyOrNull("event_id")?.Pipe(SentryId.FromJson) ?? SentryId.Empty;
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var email = json.GetPropertyOrNull("email")?.GetString();
-        var comments = json.GetPropertyOrNull("comments")?.GetString();
+        var eventId = json["event_id"] != null ? SentryId.FromJson(json["event_id"]!) : SentryId.Empty;
+        var name = json["name"]?.Value<string>();
+        var email = json["email"]?.Value<string>();
+        var comments = json["comments"]?.Value<string>();
 
         return new UserFeedback(eventId, name, email, comments);
     }

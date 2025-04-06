@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+
 namespace Sentry.Internal.GraphQL;
 
 /// <summary>
@@ -20,29 +22,31 @@ internal static class GraphQLRequestContentReader
 
     public static IReadOnlyDictionary<string, object> Read(string requestContent)
     {
-        Utf8JsonReader reader = new(Encoding.UTF8.GetBytes(requestContent));
-        if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
+        using var stringReader = new StringReader(requestContent);
+        using var jsonReader = new JsonTextReader(stringReader);
+
+        if (!jsonReader.Read() || jsonReader.TokenType != JsonToken.StartObject)
         {
             throw new JsonException("Expected start of object");
         }
 
         var request = new Dictionary<string, object>();
 
-        while (reader.Read())
+        while (jsonReader.Read())
         {
-            if (reader.TokenType == JsonTokenType.EndObject)
+            if (jsonReader.TokenType == JsonToken.EndObject)
             {
                 return request;
             }
 
-            if (reader.TokenType != JsonTokenType.PropertyName)
+            if (jsonReader.TokenType != JsonToken.PropertyName)
             {
                 throw new JsonException("Expected property name");
             }
 
-            var key = reader.GetString()!;
+            var key = (string)jsonReader.Value!;
 
-            if (!reader.Read())
+            if (!jsonReader.Read())
             {
                 throw new JsonException("unexpected end of data");
             }
@@ -51,10 +55,10 @@ internal static class GraphQLRequestContentReader
             {
                 case QueryKey:
                 case OperationNameKey:
-                    request[key] = reader.GetString()!;
+                    request[key] = (string)jsonReader.Value!;
                     break;
                 default:
-                    reader.Skip();
+                    jsonReader.Skip();
                     break;
             }
         }

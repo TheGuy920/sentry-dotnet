@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -36,15 +38,39 @@ public sealed class SentryThread : ISentryJsonSerializable
     public SentryStackTrace? Stacktrace { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteNumberIfNotNull("id", Id);
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteBooleanIfNotNull("crashed", Crashed);
-        writer.WriteBooleanIfNotNull("current", Current);
-        writer.WriteSerializableIfNotNull("stacktrace", Stacktrace, logger);
+        if (Id.HasValue)
+        {
+            writer.WritePropertyName("id");
+            writer.WriteValue(Id.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("name");
+            writer.WriteValue(Name);
+        }
+
+        if (Crashed.HasValue)
+        {
+            writer.WritePropertyName("crashed");
+            writer.WriteValue(Crashed.Value);
+        }
+
+        if (Current.HasValue)
+        {
+            writer.WritePropertyName("current");
+            writer.WriteValue(Current.Value);
+        }
+
+        if (Stacktrace != null)
+        {
+            writer.WritePropertyName("stacktrace");
+            Stacktrace.WriteTo(writer, logger);
+        }
 
         writer.WriteEndObject();
     }
@@ -52,13 +78,13 @@ public sealed class SentryThread : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryThread FromJson(JsonElement json)
+    public static SentryThread FromJson(JToken json)
     {
-        var id = json.GetPropertyOrNull("id")?.GetInt32();
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var crashed = json.GetPropertyOrNull("crashed")?.GetBoolean();
-        var current = json.GetPropertyOrNull("current")?.GetBoolean();
-        var stacktrace = json.GetPropertyOrNull("stacktrace")?.Pipe(SentryStackTrace.FromJson);
+        var id = json["id"]?.Value<int>();
+        var name = json["name"]?.Value<string>();
+        var crashed = json["crashed"]?.Value<bool>();
+        var current = json["current"]?.Value<bool>();
+        var stacktrace = json["stacktrace"] != null ? SentryStackTrace.FromJson(json["stacktrace"]!) : null;
 
         return new SentryThread
         {

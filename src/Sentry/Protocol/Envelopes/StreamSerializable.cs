@@ -19,7 +19,7 @@ internal sealed class StreamSerializable : ISerializable, IDisposable
 
     /// <inheritdoc />
     public Task SerializeAsync(Stream stream, IDiagnosticLogger? logger, CancellationToken cancellationToken = default) =>
-        Source.CopyToAsync(stream, cancellationToken);
+        Source.CopyToAsync(stream, (int)stream.Length, cancellationToken);
 
     /// <inheritdoc />
     public void Serialize(Stream stream, IDiagnosticLogger? logger) => Source.CopyTo(stream);

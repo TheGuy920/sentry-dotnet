@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -41,7 +42,7 @@ internal record SpanMetric
     }
 
     /// <inheritdoc cref="ISentryJsonSerializable.WriteTo"/>
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WriteNumber("min", Min);

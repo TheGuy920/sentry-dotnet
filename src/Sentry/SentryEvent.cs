@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Integrations;
 using Sentry.Internal.Extensions;
@@ -250,33 +252,155 @@ public sealed class SentryEvent : IEventLike, ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringDictionaryIfNotEmpty("modules", _modules!);
-        writer.WriteSerializable("event_id", EventId, logger);
-        writer.WriteString("timestamp", Timestamp);
-        writer.WriteSerializableIfNotNull("logentry", Message, logger);
-        writer.WriteStringIfNotWhiteSpace("logger", Logger);
-        writer.WriteStringIfNotWhiteSpace("platform", Platform);
-        writer.WriteStringIfNotWhiteSpace("server_name", ServerName);
-        writer.WriteStringIfNotWhiteSpace("release", Release);
-        writer.WriteStringIfNotWhiteSpace("dist", Distribution);
-        writer.WriteSerializableIfNotNull("exception", SentryExceptionValues, logger);
-        writer.WriteSerializableIfNotNull("threads", SentryThreadValues, logger);
-        writer.WriteStringIfNotWhiteSpace("level", Level?.ToString().ToLowerInvariant());
-        writer.WriteStringIfNotWhiteSpace("transaction", TransactionName);
-        writer.WriteSerializableIfNotNull("request", _request, logger);
-        writer.WriteSerializableIfNotNull("contexts", _contexts.NullIfEmpty(), logger);
-        writer.WriteSerializableIfNotNull("user", _user, logger);
-        writer.WriteStringIfNotWhiteSpace("environment", Environment);
-        writer.WriteSerializable("sdk", Sdk, logger);
-        writer.WriteStringArrayIfNotEmpty("fingerprint", _fingerprint);
-        writer.WriteArrayIfNotEmpty("breadcrumbs", _breadcrumbs, logger);
-        writer.WriteDictionaryIfNotEmpty("extra", _extra, logger);
-        writer.WriteStringDictionaryIfNotEmpty("tags", _tags!);
-        writer.WriteSerializableIfNotNull("debug_meta", _debugMeta, logger);
+        if (_modules != null && _modules.Count > 0)
+        {
+            writer.WritePropertyName("modules");
+            JsonSerializer.Create().Serialize(writer, _modules);
+        }
+
+        writer.WritePropertyName("event_id");
+        EventId.WriteTo(writer, logger);
+
+        writer.WritePropertyName("timestamp");
+        writer.WriteValue(Timestamp);
+
+        if (Message != null)
+        {
+            writer.WritePropertyName("logentry");
+            Message.WriteTo(writer, logger);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Logger))
+        {
+            writer.WritePropertyName("logger");
+            writer.WriteValue(Logger);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Platform))
+        {
+            writer.WritePropertyName("platform");
+            writer.WriteValue(Platform);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ServerName))
+        {
+            writer.WritePropertyName("server_name");
+            writer.WriteValue(ServerName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Release))
+        {
+            writer.WritePropertyName("release");
+            writer.WriteValue(Release);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Distribution))
+        {
+            writer.WritePropertyName("dist");
+            writer.WriteValue(Distribution);
+        }
+
+        if (SentryExceptionValues != null)
+        {
+            writer.WritePropertyName("exception");
+            SentryExceptionValues.WriteTo(writer, logger);
+        }
+
+        if (SentryThreadValues != null)
+        {
+            writer.WritePropertyName("threads");
+            SentryThreadValues.WriteTo(writer, logger);
+        }
+
+        if (Level.HasValue)
+        {
+            writer.WritePropertyName("level");
+            writer.WriteValue(Level.Value.ToString().ToLowerInvariant());
+        }
+
+        if (!string.IsNullOrWhiteSpace(TransactionName))
+        {
+            writer.WritePropertyName("transaction");
+            writer.WriteValue(TransactionName);
+        }
+
+        if (_request != null)
+        {
+            writer.WritePropertyName("request");
+            _request.WriteTo(writer, logger);
+        }
+
+        var contextsNotEmpty = _contexts.NullIfEmpty();
+        if (contextsNotEmpty != null)
+        {
+            writer.WritePropertyName("contexts");
+            contextsNotEmpty.WriteTo(writer, logger);
+        }
+
+        if (_user != null)
+        {
+            writer.WritePropertyName("user");
+            _user.WriteTo(writer, logger);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Environment))
+        {
+            writer.WritePropertyName("environment");
+            writer.WriteValue(Environment);
+        }
+
+        writer.WritePropertyName("sdk");
+        Sdk.WriteTo(writer, logger);
+
+        if (_fingerprint != null && _fingerprint.Count > 0)
+        {
+            writer.WritePropertyName("fingerprint");
+            writer.WriteStartArray();
+            foreach (var item in _fingerprint)
+            {
+                writer.WriteValue(item);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (_breadcrumbs != null && _breadcrumbs.Count > 0)
+        {
+            writer.WritePropertyName("breadcrumbs");
+            writer.WriteStartArray();
+            foreach (var breadcrumb in _breadcrumbs)
+            {
+                breadcrumb.WriteTo(writer, logger);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (_extra != null && _extra.Count > 0)
+        {
+            writer.WritePropertyName("extra");
+            writer.WriteStartObject();
+            foreach (var item in _extra)
+            {
+                writer.WritePropertyName(item.Key);
+                JsonSerializer.Create().Serialize(writer, item.Value);
+            }
+            writer.WriteEndObject();
+        }
+
+        if (_tags != null && _tags.Count > 0)
+        {
+            writer.WritePropertyName("tags");
+            JsonSerializer.Create().Serialize(writer, _tags);
+        }
+
+        if (_debugMeta != null)
+        {
+            writer.WritePropertyName("debug_meta");
+            _debugMeta.WriteTo(writer, logger);
+        }
 
         writer.WriteEndObject();
     }
@@ -284,11 +408,15 @@ public sealed class SentryEvent : IEventLike, ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryEvent FromJson(JsonElement json) => FromJson(json, null);
+    public static SentryEvent FromJson(JToken json) => FromJson(json, null);
 
-    private static SentryLevel? SafeLevelFromJson(JsonElement json)
+    private static SentryLevel? SafeLevelFromJson(JToken json)
     {
-        var levelString = json.GetPropertyOrNull("level")?.GetString();
+        var levelToken = json["level"];
+        if (levelToken == null || levelToken.Type == JTokenType.Null)
+            return null;
+
+        var levelString = levelToken.Value<string>();
         if (levelString == null)
             return null;
 
@@ -304,32 +432,36 @@ public sealed class SentryEvent : IEventLike, ISentryJsonSerializable
         };
     }
 
-    internal static SentryEvent FromJson(JsonElement json, Exception? exception)
+    internal static SentryEvent FromJson(JToken json, Exception? exception)
     {
-        var modules = json.GetPropertyOrNull("modules")?.GetStringDictionaryOrNull();
-        var eventId = json.GetPropertyOrNull("event_id")?.Pipe(SentryId.FromJson) ?? SentryId.Empty;
-        var timestamp = json.GetSafeDateTimeOffset("timestamp"); // Native sentryevents are serialized to epoch timestamps
-        var message = json.GetPropertyOrNull("logentry")?.Pipe(SentryMessage.FromJson);
-        var logger = json.GetPropertyOrNull("logger")?.GetString();
-        var platform = json.GetPropertyOrNull("platform")?.GetString();
-        var serverName = json.GetPropertyOrNull("server_name")?.GetString();
-        var release = json.GetPropertyOrNull("release")?.GetString();
-        var distribution = json.GetPropertyOrNull("dist")?.GetString();
-        var exceptionValues = json.GetPropertyOrNull("exception")?.GetPropertyOrNull("values")?.EnumerateArray().Select(SentryException.FromJson).ToList().Pipe(v => new SentryValues<SentryException>(v));
-        var threadValues = json.GetPropertyOrNull("threads")?.GetPropertyOrNull("values")?.EnumerateArray().Select(SentryThread.FromJson).ToList().Pipe(v => new SentryValues<SentryThread>(v));
+        var modules = json["modules"]?.ToObject<Dictionary<string, string?>>();
+        var eventId = json["event_id"] != null ? SentryId.FromJson(json["event_id"]!) : SentryId.Empty;
+        var timestamp = json["timestamp"]?.Value<DateTimeOffset>() ?? DateTimeOffset.MinValue; // Native sentryevents are serialized to epoch timestamps
+        var message = json["logentry"] != null ? SentryMessage.FromJson(json["logentry"]!) : null;
+        var logger = json["logger"]?.Value<string>();
+        var platform = json["platform"]?.Value<string>();
+        var serverName = json["server_name"]?.Value<string>();
+        var release = json["release"]?.Value<string>();
+        var distribution = json["dist"]?.Value<string>();
 
-        var transaction = json.GetPropertyOrNull("transaction")?.GetString();
-        var request = json.GetPropertyOrNull("request")?.Pipe(SentryRequest.FromJson);
-        var contexts = json.GetPropertyOrNull("contexts")?.Pipe(SentryContexts.FromJson);
-        var user = json.GetPropertyOrNull("user")?.Pipe(SentryUser.FromJson);
-        var environment = json.GetPropertyOrNull("environment")?.GetString();
-        var sdk = json.GetPropertyOrNull("sdk")?.Pipe(SdkVersion.FromJson) ?? new SdkVersion();
-        var fingerprint = json.GetPropertyOrNull("fingerprint")?.EnumerateArray().Select(j => j.GetString()).ToArray();
-        var breadcrumbs = json.GetPropertyOrNull("breadcrumbs")?.EnumerateArray().Select(Breadcrumb.FromJson).ToList();
-        var extra = json.GetPropertyOrNull("extra")?.GetDictionaryOrNull();
-        var tags = json.GetPropertyOrNull("tags")?.GetStringDictionaryOrNull();
+        var exceptionValues = json["exception"]?["values"]?.ToObject<JArray>()?.Select(token => SentryException.FromJson(token)).ToList();
+        var sentryExceptionValues = exceptionValues != null ? new SentryValues<SentryException>(exceptionValues) : null;
+
+        var threadValues = json["threads"]?["values"]?.ToObject<JArray>()?.Select(token => SentryThread.FromJson(token)).ToList();
+        var sentryThreadValues = threadValues != null ? new SentryValues<SentryThread>(threadValues) : null;
+
+        var transaction = json["transaction"]?.Value<string>();
+        var request = json["request"] != null ? SentryRequest.FromJson(json["request"]!) : null;
+        var contexts = json["contexts"] != null ? SentryContexts.FromJson(json["contexts"]!) : null;
+        var user = json["user"] != null ? SentryUser.FromJson(json["user"]!) : null;
+        var environment = json["environment"]?.Value<string>();
+        var sdk = json["sdk"] != null ? SdkVersion.FromJson(json["sdk"]!) : new SdkVersion();
+        var fingerprint = json["fingerprint"]?.ToObject<JArray>()?.Select(j => j.Value<string>()).ToArray();
+        var breadcrumbs = json["breadcrumbs"]?.ToObject<JArray>()?.Select(token => Breadcrumb.FromJson((JObject)token)).ToList();
+        var extra = json["extra"]?.ToObject<Dictionary<string, object?>>();
+        var tags = json["tags"]?.ToObject<Dictionary<string, string?>>();
         var level = SafeLevelFromJson(json);
-        var debugMeta = json.GetPropertyOrNull("debug_meta")?.Pipe(DebugMeta.FromJson);
+        var debugMeta = json["debug_meta"] != null ? DebugMeta.FromJson(json["debug_meta"]!) : null;
 
         return new SentryEvent(exception, timestamp, eventId)
         {
@@ -340,8 +472,8 @@ public sealed class SentryEvent : IEventLike, ISentryJsonSerializable
             ServerName = serverName,
             Release = release,
             Distribution = distribution,
-            SentryExceptionValues = exceptionValues,
-            SentryThreadValues = threadValues,
+            SentryExceptionValues = sentryExceptionValues,
+            SentryThreadValues = sentryThreadValues,
             _debugMeta = debugMeta,
             Level = level,
             TransactionName = transaction,

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -60,11 +62,11 @@ public sealed class Browser : ISentryJsonSerializable, ICloneable<Browser>, IUpd
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", Type);
+        writer.WriteStringIfNotWhiteSpace("type", Type);
         writer.WriteStringIfNotWhiteSpace("name", Name);
         writer.WriteStringIfNotWhiteSpace("version", Version);
 
@@ -74,11 +76,12 @@ public sealed class Browser : ISentryJsonSerializable, ICloneable<Browser>, IUpd
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Browser FromJson(JsonElement json)
+    public static Browser FromJson(JObject json)
     {
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var version = json.GetPropertyOrNull("version")?.GetString();
-
-        return new Browser { Name = name, Version = version };
+        return new Browser
+        {
+            Name = json["name"]?.Value<string>(),
+            Version = json["version"]?.Value<string>()
+        };
     }
 }

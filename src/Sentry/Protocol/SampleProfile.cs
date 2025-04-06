@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -18,37 +19,27 @@ internal sealed class SampleProfile : ISentryJsonSerializable
     internal Internal.GrowableArray<Internal.GrowableArray<int>> Stacks = new(100);
     internal List<SentryThread> Threads = new(10);
 
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
-        writer.WriteStartObject("thread_metadata");
+        writer.WritePropertyName("thread_metadata");
+        writer.WriteStartObject();
         for (var i = 0; i < Threads.Count; i++)
         {
-            writer.WriteSerializable(i.ToString(), Threads[i], logger);
+            writer.WritePropertyName(i.ToString());
+            Threads[i].WriteTo(writer, logger);
         }
         writer.WriteEndObject();
 
-#if NETFRAMEWORK
-        if (PlatformAbstractions.SentryRuntime.Current.IsMono())
-        {
-            // STJ doesn't like HashableGrowableArray on Mono, failing with:
-            //   Invalid IL code in (wrapper dynamic-method) object:.ctor (): IL_0005: ret
-            // We can work around this by converting them to regular arrays.
-            // (This appears fixed as of STJ 6.0.5, but that's too high of a minimal dependency for us.)
-            // Probably we won't ever hit this for real, because we only support profiling on .NET 6+
-            // but this allows the tests to pass.
-            var stacks = Stacks.Select(s => s.ToArray());
-            writer.WriteArray("stacks", stacks, logger);
-        }
-        else
-        {
-            writer.WriteArray("stacks", Stacks, logger);
-        }
-#else
-        writer.WriteArray("stacks", Stacks, logger);
-#endif
-        writer.WriteArray("frames", Frames, logger);
-        writer.WriteArray("samples", Samples, logger);
+        writer.WritePropertyName("stacks");
+        JsonSerializer.CreateDefault().Serialize(writer, Stacks);
+
+        writer.WritePropertyName("frames");
+        JsonSerializer.CreateDefault().Serialize(writer, Frames);
+
+        writer.WritePropertyName("samples");
+        JsonSerializer.CreateDefault().Serialize(writer, Samples);
+
         writer.WriteEndObject();
     }
 
@@ -57,17 +48,20 @@ internal sealed class SampleProfile : ISentryJsonSerializable
         /// <summary>
         /// Timestamp in nanoseconds relative to the profile start.
         /// </summary>
-        public ulong Timestamp;
+        public ulong Timestamp = 0;
 
-        public int ThreadId;
-        public int StackId;
+        public int ThreadId = 0;
+        public int StackId = 0;
 
-        public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+        public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
         {
             writer.WriteStartObject();
-            writer.WriteNumber("elapsed_since_start_ns", Timestamp);
-            writer.WriteNumber("thread_id", ThreadId);
-            writer.WriteNumber("stack_id", StackId);
+            writer.WritePropertyName("elapsed_since_start_ns");
+            writer.WriteValue(Timestamp);
+            writer.WritePropertyName("thread_id");
+            writer.WriteValue(ThreadId);
+            writer.WritePropertyName("stack_id");
+            writer.WriteValue(StackId);
             writer.WriteEndObject();
         }
     }

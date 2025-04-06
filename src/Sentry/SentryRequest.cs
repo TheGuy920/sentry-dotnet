@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -142,18 +144,63 @@ public sealed class SentryRequest : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringDictionaryIfNotEmpty("env", InternalEnv!);
-        writer.WriteStringDictionaryIfNotEmpty("other", InternalOther!);
-        writer.WriteStringDictionaryIfNotEmpty("headers", InternalHeaders!);
-        writer.WriteStringIfNotWhiteSpace("url", Url);
-        writer.WriteStringIfNotWhiteSpace("method", Method);
-        writer.WriteDynamicIfNotNull("data", Data, logger);
-        writer.WriteStringIfNotWhiteSpace("query_string", QueryString);
-        writer.WriteStringIfNotWhiteSpace("cookies", Cookies);
+        if (InternalEnv != null && InternalEnv.Count > 0)
+        {
+            writer.WritePropertyName("env");
+            JsonSerializer.Create().Serialize(writer, InternalEnv);
+        }
+
+        if (InternalOther != null && InternalOther.Count > 0)
+        {
+            writer.WritePropertyName("other");
+            JsonSerializer.Create().Serialize(writer, InternalOther);
+        }
+
+        if (InternalHeaders != null && InternalHeaders.Count > 0)
+        {
+            writer.WritePropertyName("headers");
+            JsonSerializer.Create().Serialize(writer, InternalHeaders);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Url))
+        {
+            writer.WritePropertyName("url");
+            writer.WriteValue(Url);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Method))
+        {
+            writer.WritePropertyName("method");
+            writer.WriteValue(Method);
+        }
+
+        if (Data != null)
+        {
+            writer.WritePropertyName("data");
+            JsonSerializer.Create().Serialize(writer, Data);
+        }
+
+        if (!string.IsNullOrWhiteSpace(QueryString))
+        {
+            writer.WritePropertyName("query_string");
+            writer.WriteValue(QueryString);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Cookies))
+        {
+            writer.WritePropertyName("cookies");
+            writer.WriteValue(Cookies);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ApiTarget))
+        {
+            writer.WritePropertyName("api_target");
+            writer.WriteValue(ApiTarget);
+        }
 
         writer.WriteEndObject();
     }
@@ -161,16 +208,17 @@ public sealed class SentryRequest : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryRequest FromJson(JsonElement json)
+    public static SentryRequest FromJson(JToken json)
     {
-        var env = json.GetPropertyOrNull("env")?.GetStringDictionaryOrNull();
-        var other = json.GetPropertyOrNull("other")?.GetStringDictionaryOrNull();
-        var headers = json.GetPropertyOrNull("headers")?.GetStringDictionaryOrNull();
-        var url = json.GetPropertyOrNull("url")?.GetString();
-        var method = json.GetPropertyOrNull("method")?.GetString();
-        var data = json.GetPropertyOrNull("data")?.GetDynamicOrNull();
-        var query = json.GetPropertyOrNull("query_string")?.GetString();
-        var cookies = json.GetPropertyOrNull("cookies")?.GetString();
+        var env = json["env"]?.ToObject<Dictionary<string, string?>>();
+        var other = json["other"]?.ToObject<Dictionary<string, string?>>();
+        var headers = json["headers"]?.ToObject<Dictionary<string, string?>>();
+        var url = json["url"]?.Value<string>();
+        var method = json["method"]?.Value<string>();
+        var apiTarget = json["api_target"]?.Value<string>();
+        var data = json["data"]?.ToObject<object>();
+        var query = json["query_string"]?.Value<string>();
+        var cookies = json["cookies"]?.Value<string>();
 
         return new SentryRequest
         {
@@ -179,6 +227,7 @@ public sealed class SentryRequest : ISentryJsonSerializable
             InternalHeaders = headers?.WhereNotNullValue().ToDict(),
             Url = url,
             Method = method,
+            ApiTarget = apiTarget,
             Data = data,
             QueryString = query,
             Cookies = cookies

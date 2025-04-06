@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Serialization;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 using Sentry.Internal.GraphQL;
@@ -6,7 +8,7 @@ namespace Sentry;
 
 internal class GraphQLRequestContent
 {
-    private static JsonSerializerOptions SerializerOptions => new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+    private static readonly JsonSerializerSettings SerializerSettings = new() { ContractResolver = new CamelCasePropertyNamesContractResolver() };
 
     private static readonly Regex Expression = new(
         @"\s*(?<operationType>\bquery\b|\bmutation\b|\bsubscription\b)\s*(?<operationName>\w+)?\s*(?<query>{.*})\s*",

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -42,13 +44,32 @@ public sealed class SentryMessage : ISentryJsonSerializable
     public static implicit operator SentryMessage(string? message) => new() { Message = message };
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringIfNotWhiteSpace("message", Message);
-        writer.WriteArrayIfNotEmpty("params", Params, logger);
-        writer.WriteStringIfNotWhiteSpace("formatted", Formatted);
+        if (!string.IsNullOrWhiteSpace(Message))
+        {
+            writer.WritePropertyName("message");
+            writer.WriteValue(Message);
+        }
+
+        if (Params?.Any() == true)
+        {
+            writer.WritePropertyName("params");
+            writer.WriteStartArray();
+            foreach (var param in Params)
+            {
+                writer.WriteValue(param);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Formatted))
+        {
+            writer.WritePropertyName("formatted");
+            writer.WriteValue(Formatted);
+        }
 
         writer.WriteEndObject();
     }
@@ -56,11 +77,11 @@ public sealed class SentryMessage : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryMessage FromJson(JsonElement json)
+    public static SentryMessage FromJson(JToken json)
     {
-        var message = json.GetPropertyOrNull("message")?.GetString();
-        var @params = json.GetPropertyOrNull("params")?.EnumerateArray().Select(j => j.GetDynamicOrNull()).Where(o => o != null).ToArray();
-        var formatted = json.GetPropertyOrNull("formatted")?.GetString();
+        var message = json["message"]?.Value<string>();
+        var @params = json["params"]?.ToObject<JArray>()?.Select(j => j.ToObject<object>()).Where(o => o != null).ToArray();
+        var formatted = json["formatted"]?.Value<string>();
 
         return new SentryMessage
         {

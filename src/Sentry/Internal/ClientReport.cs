@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -15,13 +17,15 @@ internal class ClientReport : ISentryJsonSerializable
         DiscardedEvents = discardedEvents;
     }
 
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("timestamp", Timestamp);
+        writer.WritePropertyName("timestamp");
+        writer.WriteValue(Timestamp);
 
-        writer.WriteStartArray("discarded_events");
+        writer.WritePropertyName("discarded_events");
+        writer.WriteStartArray();
 
         // filter out empty counters, and sort the counters to allow for deterministic testing
         var discardedEvents = DiscardedEvents
@@ -32,9 +36,16 @@ internal class ClientReport : ISentryJsonSerializable
         foreach (var item in discardedEvents)
         {
             writer.WriteStartObject();
-            writer.WriteString("reason", item.Key.Reason);
-            writer.WriteString("category", item.Key.Category);
-            writer.WriteNumber("quantity", item.Value);
+
+            writer.WritePropertyName("reason");
+            writer.WriteValue(item.Key.Reason);
+
+            writer.WritePropertyName("category");
+            writer.WriteValue(item.Key.Category);
+
+            writer.WritePropertyName("quantity");
+            writer.WriteValue(item.Value);
+
             writer.WriteEndObject();
         }
 
@@ -46,15 +57,17 @@ internal class ClientReport : ISentryJsonSerializable
     /// <summary>
     /// Parses <see cref="ClientReport"/> from <paramref name="json"/>.
     /// </summary>
-    public static ClientReport FromJson(JsonElement json)
+    public static ClientReport FromJson(JToken json)
     {
-        var timestamp = json.GetProperty("timestamp").GetDateTimeOffset();
-        var discardedEvents = json.GetProperty("discarded_events").EnumerateArray()
+        var timestamp = json["timestamp"]!.Value<DateTimeOffset>();
+        var discardedEventsArray = (JArray)json["discarded_events"]!;
+
+        var discardedEvents = discardedEventsArray
             .Select(x => new
             {
-                Reason = x.GetProperty("reason").GetString()!,
-                Category = x.GetProperty("category").GetString()!,
-                Quantity = x.GetProperty("quantity").GetInt32()
+                Reason = x["reason"]!.Value<string>()!,
+                Category = x["category"]!.Value<string>()!,
+                Quantity = x["quantity"]!.Value<int>()
             })
             .ToDictionary(
                 x => new DiscardReasonWithCategory(x.Reason, x.Category),

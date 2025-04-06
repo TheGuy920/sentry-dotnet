@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -26,7 +27,7 @@ internal class DistributionMetric : Metric
 
     public override void Add(double value) => _value.Add(value);
 
-    protected override void WriteValues(Utf8JsonWriter writer, IDiagnosticLogger? logger) =>
+    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger) =>
         writer.WriteArrayIfNotEmpty<double>("value", _value, logger);
 
     protected override IEnumerable<IConvertible> SerializedStatsdValues()

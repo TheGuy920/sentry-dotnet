@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -58,23 +60,49 @@ public sealed class SentryFeedback : ISentryJsonSerializable, ICloneable<SentryF
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         if (string.IsNullOrEmpty(Message))
         {
             logger?.LogWarning("Feedback message is empty - serializing as null");
-            writer.WriteNullValue();
+            writer.WriteNull();
             return;
         }
 
         writer.WriteStartObject();
 
-        writer.WriteString("message", Message);
-        writer.WriteStringIfNotWhiteSpace("contact_email", ContactEmail);
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteStringIfNotWhiteSpace("replay_id", ReplayId);
-        writer.WriteStringIfNotWhiteSpace("url", Url);
-        writer.WriteSerializableIfNotNull("associated_event_id", AssociatedEventId, logger);
+        writer.WritePropertyName("message");
+        writer.WriteValue(Message);
+
+        if (!string.IsNullOrWhiteSpace(ContactEmail))
+        {
+            writer.WritePropertyName("contact_email");
+            writer.WriteValue(ContactEmail);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("name");
+            writer.WriteValue(Name);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ReplayId))
+        {
+            writer.WritePropertyName("replay_id");
+            writer.WriteValue(ReplayId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Url))
+        {
+            writer.WritePropertyName("url");
+            writer.WriteValue(Url);
+        }
+
+        if (AssociatedEventId != null)
+        {
+            writer.WritePropertyName("associated_event_id");
+            // AssociatedEventId.WriteTo(writer, logger);
+        }
 
         writer.WriteEndObject();
     }
@@ -82,14 +110,17 @@ public sealed class SentryFeedback : ISentryJsonSerializable, ICloneable<SentryF
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryFeedback FromJson(JsonElement json)
+    /// <summary>
+    /// Parses from JSON.
+    /// </summary>
+    public static SentryFeedback FromJson(JObject json)
     {
-        var message = json.GetPropertyOrNull("message")?.GetString() ?? "<empty>";
-        var contactEmail = json.GetPropertyOrNull("contact_email")?.GetString();
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var replayId = json.GetPropertyOrNull("replay_id")?.GetString();
-        var url = json.GetPropertyOrNull("url")?.GetString();
-        var eventId = json.GetPropertyOrNull("associated_event_id")?.Pipe(SentryId.FromJson);
+        var message = json["message"]?.Value<string>() ?? "<empty>";
+        var contactEmail = json["contact_email"]?.Value<string>();
+        var name = json["name"]?.Value<string>();
+        var replayId = json["replay_id"]?.Value<string>();
+        var url = json["url"]?.Value<string>();
+        var eventId = json["associated_event_id"] != null ? SentryId.FromJson(json["associated_event_id"]!) : default;
 
         return new SentryFeedback(message, contactEmail, name, replayId, url, eventId);
     }

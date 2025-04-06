@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -87,7 +89,7 @@ public sealed class Runtime : ISentryJsonSerializable, ICloneable<Runtime>, IUpd
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? _)
     {
         writer.WriteStartObject();
 
@@ -104,21 +106,15 @@ public sealed class Runtime : ISentryJsonSerializable, ICloneable<Runtime>, IUpd
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Runtime FromJson(JsonElement json)
+    public static Runtime FromJson(JObject json)
     {
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var version = json.GetPropertyOrNull("version")?.GetString();
-        var rawDescription = json.GetPropertyOrNull("raw_description")?.GetString();
-        var identifier = json.GetPropertyOrNull("identifier")?.GetString();
-        var build = json.GetPropertyOrNull("build")?.GetString();
-
         return new Runtime
         {
-            Name = name,
-            Version = version,
-            RawDescription = rawDescription,
-            Identifier = identifier,
-            Build = build
+            Name = json.GetValue("name")?.Value<string>(),
+            Version = json.GetValue("version")?.Value<string>(),
+            RawDescription = json.GetValue("raw_description")?.Value<string>(),
+            Identifier = json.GetValue("identifier")?.Value<string>(),
+            Build = json.GetValue("build")?.Value<string>()
         };
     }
 }

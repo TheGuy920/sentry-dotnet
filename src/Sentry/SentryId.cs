@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 
 namespace Sentry;
@@ -44,7 +46,7 @@ public readonly struct SentryId : IEquatable<SentryId>, ISentryJsonSerializable
     public static SentryId Create() => new(Guid.NewGuid());
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger) => writer.WriteStringValue(ToString());
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger) => writer.WriteValue(ToString());
 
     /// <summary>
     /// Parses from string.
@@ -54,9 +56,9 @@ public readonly struct SentryId : IEquatable<SentryId>, ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryId FromJson(JsonElement json)
+    public static SentryId FromJson(JToken json)
     {
-        var id = json.GetString();
+        var id = json.Value<string>();
 
         return !string.IsNullOrWhiteSpace(id)
             ? Parse(id)

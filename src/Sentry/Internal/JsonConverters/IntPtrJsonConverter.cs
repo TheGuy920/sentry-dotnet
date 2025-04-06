@@ -1,14 +1,30 @@
 namespace Sentry.Internal.JsonConverters;
 
-internal class IntPtrJsonConverter : JsonConverter<IntPtr>
+using System;
+using Newtonsoft.Json;
+
+internal class IntPtrJsonConverter : JsonConverter
 {
-    public override IntPtr Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override bool CanConvert(Type objectType)
     {
-        return new IntPtr(reader.GetInt64());
+        return objectType == typeof(IntPtr);
     }
 
-    public override void Write(Utf8JsonWriter writer, IntPtr value, JsonSerializerOptions options)
+    public override object ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
     {
-        writer.WriteNumberValue(value.ToInt64());
+        if (reader.TokenType == JsonToken.Null)
+        {
+            return IntPtr.Zero;
+        }
+
+        return new IntPtr(Convert.ToInt64(reader.Value));
+    }
+
+    public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+    {
+        if (value is IntPtr intPtr)
+        {
+            writer.WriteValue(intPtr.ToInt64());
+        }
     }
 }

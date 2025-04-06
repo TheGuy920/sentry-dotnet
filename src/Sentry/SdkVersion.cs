@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 using Sentry.Reflection;
@@ -69,14 +71,43 @@ public sealed class SdkVersion : ISentryJsonSerializable
         => Integrations.Add(integration);
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteArrayIfNotEmpty("packages", InternalPackages.Distinct(), logger);
-        writer.WriteArrayIfNotEmpty("integrations", Integrations.Distinct(), logger);
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteStringIfNotWhiteSpace("version", Version);
+        if (InternalPackages.Any())
+        {
+            writer.WritePropertyName("packages");
+            writer.WriteStartArray();
+            foreach (var package in InternalPackages.Distinct())
+            {
+                writer.WriteValue(package);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (Integrations.Any())
+        {
+            writer.WritePropertyName("integrations");
+            writer.WriteStartArray();
+            foreach (var integration in Integrations.Distinct())
+            {
+                writer.WriteValue(integration);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("name");
+            writer.WriteValue(Name);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Version))
+        {
+            writer.WritePropertyName("version");
+            writer.WriteValue(Version);
+        }
 
         writer.WriteEndObject();
     }
@@ -84,23 +115,23 @@ public sealed class SdkVersion : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SdkVersion FromJson(JsonElement json)
+    public static SdkVersion FromJson(JToken json)
     {
         // Packages
         var packages =
-            json.GetPropertyOrNull("packages")?.EnumerateArray().Select(SentryPackage.FromJson).ToArray()
+            json["packages"]?.ToObject<JArray>()?.Select(SentryPackage.FromJson).ToArray()
             ?? Array.Empty<SentryPackage>();
 
         // Integrations
         var integrations =
-            json.GetPropertyOrNull("integrations")?.EnumerateArray().Select(element => element.ToString() ?? "").ToArray()
+            json["integrations"]?.ToObject<JArray>()?.Select(element => element.ToString() ?? "").ToArray()
             ?? Array.Empty<string>();
 
         // Name
-        var name = json.GetPropertyOrNull("name")?.GetString() ?? "dotnet.unknown";
+        var name = (json["name"]?.ToString()) ?? "dotnet.unknown";
 
         // Version
-        var version = json.GetPropertyOrNull("version")?.GetString() ?? "0.0.0";
+        var version = (json["version"]?.ToString()) ?? "0.0.0";
 
         return new SdkVersion
         {

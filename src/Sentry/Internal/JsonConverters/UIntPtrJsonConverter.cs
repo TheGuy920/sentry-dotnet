@@ -1,14 +1,18 @@
 namespace Sentry.Internal.JsonConverters;
 
+using Newtonsoft.Json;
+
 internal class UIntPtrJsonConverter : JsonConverter<UIntPtr>
 {
-    public override UIntPtr Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override UIntPtr ReadJson(JsonReader reader, Type objectType, UIntPtr existingValue, bool hasExistingValue, JsonSerializer serializer)
     {
-        return new UIntPtr(reader.GetUInt64());
+        return new UIntPtr(Convert.ToUInt64(reader.Value));
     }
 
-    public override void Write(Utf8JsonWriter writer, UIntPtr value, JsonSerializerOptions options)
+    public override void WriteJson(JsonWriter writer, UIntPtr value, JsonSerializer serializer)
     {
-        writer.WriteNumberValue(value.ToUInt64());
+        writer.WriteValue(value.ToUInt64());
     }
+
+    public override bool CanRead => true;
 }

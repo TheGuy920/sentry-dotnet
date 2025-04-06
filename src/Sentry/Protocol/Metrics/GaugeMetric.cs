@@ -1,4 +1,6 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
+using Sentry.Internal.Extensions;
 
 namespace Sentry.Protocol.Metrics;
 
@@ -45,7 +47,7 @@ internal class GaugeMetric : Metric
         Count++;
     }
 
-    protected override void WriteValues(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteNumber("value", Value);
         writer.WriteNumber("first", First);

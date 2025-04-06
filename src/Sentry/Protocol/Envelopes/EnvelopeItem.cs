@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -136,8 +137,8 @@ public sealed class EnvelopeItem : ISerializable, IDisposable
         IDiagnosticLogger? logger,
         CancellationToken cancellationToken)
     {
-        var writer = new Utf8JsonWriter(stream);
-        await using (writer.ConfigureAwait(false))
+        var writer = new JsonTextWriter(new StreamWriter(stream));
+        // await using (writer.ConfigureAwait(false))
         {
             writer.WriteDictionaryValue(header, logger);
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -149,7 +150,7 @@ public sealed class EnvelopeItem : ISerializable, IDisposable
         IReadOnlyDictionary<string, object?> header,
         IDiagnosticLogger? logger)
     {
-        using var writer = new Utf8JsonWriter(stream);
+        using var writer = new JsonTextWriter(new StreamWriter(stream));
         writer.WriteDictionaryValue(header, logger);
         writer.Flush();
     }
@@ -178,7 +179,7 @@ public sealed class EnvelopeItem : ISerializable, IDisposable
             await stream.WriteNewlineAsync(cancellationToken).ConfigureAwait(false);
 
             // Payload
-            await payloadBuffer.CopyToAsync(stream, cancellationToken).ConfigureAwait(false);
+            await payloadBuffer.CopyToAsync(stream, (int)stream.Length, cancellationToken).ConfigureAwait(false);
         }
     }
 

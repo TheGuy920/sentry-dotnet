@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -19,15 +20,23 @@ internal sealed class SentryValues<T> : ISentryJsonSerializable
     public SentryValues(IEnumerable<T>? values) => Values = values ?? Enumerable.Empty<T>();
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStartArray("values");
+        writer.WritePropertyName("values");
+        writer.WriteStartArray();
 
         foreach (var i in Values)
         {
-            writer.WriteDynamicValue(i, logger);
+            if (i is ISentryJsonSerializable serializable)
+            {
+                serializable.WriteTo(writer, logger);
+            }
+            else
+            {
+                JsonSerializer.Create().Serialize(writer, i);
+            }
         }
 
         writer.WriteEndArray();

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -114,7 +116,7 @@ public sealed class Response : ISentryJsonSerializable, ICloneable<Response>, IU
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
@@ -131,13 +133,13 @@ public sealed class Response : ISentryJsonSerializable, ICloneable<Response>, IU
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Response FromJson(JsonElement json)
+    public static Response FromJson(JToken json)
     {
-        var bodySize = json.GetPropertyOrNull("body_size")?.GetInt64();
-        var cookies = json.GetPropertyOrNull("cookies")?.GetString();
-        var data = json.GetPropertyOrNull("data")?.GetDynamicOrNull();
-        var headers = json.GetPropertyOrNull("headers")?.GetStringDictionaryOrNull();
-        var statusCode = json.GetPropertyOrNull("status_code")?.GetInt16();
+        var bodySize = json["body_size"]?.Value<long?>();
+        var cookies = json["cookies"]?.Value<string>();
+        var data = json["data"]?.ToObject<object>();
+        var headers = json["headers"]?.ToObject<Dictionary<string, string?>>();
+        var statusCode = json["status_code"]?.Value<short?>();
 
         return new Response
         {

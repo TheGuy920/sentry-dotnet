@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 using Sentry.Protocol.Envelopes;
@@ -9,7 +10,7 @@ namespace Sentry.Internal.Http;
 /// </summary>
 /// <remarks>
 /// Note although this class has a <see cref="CachingTransport.DisposeAsync"/>
-/// method, it doesn't implement <see cref="IAsyncDisposable"/> as this caused
+/// method, it doesn't implement IAsyncDisposable as this caused
 /// a dependency issue with Log4Net in some situations.
 ///
 /// See https://github.com/getsentry/sentry-dotnet/issues/3178

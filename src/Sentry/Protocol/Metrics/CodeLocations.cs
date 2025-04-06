@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -16,7 +17,7 @@ internal class CodeLocations(long timestamp, IReadOnlyDictionary<MetricResourceI
     public long Timestamp => timestamp;
 
     /// <inheritdoc cref="ISentryJsonSerializable.WriteTo"/>
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WriteNumber("timestamp", Timestamp);

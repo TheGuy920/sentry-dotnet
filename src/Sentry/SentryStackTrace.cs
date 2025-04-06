@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -65,11 +67,20 @@ public class SentryStackTrace : ISentryJsonSerializable
     public InstructionAddressAdjustment? AddressAdjustment { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteArrayIfNotEmpty("frames", InternalFrames, logger);
+        if (InternalFrames != null && InternalFrames.Count > 0)
+        {
+            writer.WritePropertyName("frames");
+            writer.WriteStartArray();
+            foreach (var frame in InternalFrames)
+            {
+                frame.WriteTo(writer, logger);
+            }
+            writer.WriteEndArray();
+        }
 
         if (AddressAdjustment is { } instructionAddressAdjustment)
         {
@@ -82,7 +93,8 @@ public class SentryStackTrace : ISentryJsonSerializable
                 _ => "auto"
             };
 
-            writer.WriteString("instruction_addr_adjustment", adjustmentType);
+            writer.WritePropertyName("instruction_addr_adjustment");
+            writer.WriteValue(adjustmentType);
         }
 
         writer.WriteEndObject();
@@ -91,18 +103,20 @@ public class SentryStackTrace : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryStackTrace FromJson(JsonElement json)
+    public static SentryStackTrace FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var frames = json
-            .GetPropertyOrNull("frames")
-            ?.EnumerateArray()
-            .Select(SentryStackFrame.FromJson)
+        var frames = json["frames"]?
+            .Select(token => SentryStackFrame.FromJson(token))
             .ToArray();
 
-        var instructionAddressAdjustment = json
-            .GetPropertyOrNull("instruction_addr_adjustment")
-            ?.ToString()
-            ?.ParseEnum<InstructionAddressAdjustment>();
+        var instructionAddressAdjustmentStr = json["instruction_addr_adjustment"]?.Value<string>();
+        InstructionAddressAdjustment? instructionAddressAdjustment = null;
+
+        if (instructionAddressAdjustmentStr != null &&
+            Enum.TryParse<InstructionAddressAdjustment>(instructionAddressAdjustmentStr, true, out var adjustment))
+        {
+            instructionAddressAdjustment = adjustment;
+        }
 
         return new SentryStackTrace
         {

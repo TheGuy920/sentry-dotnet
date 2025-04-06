@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -54,18 +56,57 @@ public sealed class DebugImage : ISentryJsonSerializable
     internal Guid? ModuleVersionId { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringIfNotWhiteSpace("type", Type);
-        writer.WriteStringIfNotWhiteSpace("image_addr", ImageAddress?.NullIfDefault()?.ToHexString());
-        writer.WriteNumberIfNotNull("image_size", ImageSize);
-        writer.WriteStringIfNotWhiteSpace("debug_id", DebugId);
-        writer.WriteStringIfNotWhiteSpace("debug_checksum", DebugChecksum);
-        writer.WriteStringIfNotWhiteSpace("debug_file", DebugFile);
-        writer.WriteStringIfNotWhiteSpace("code_id", CodeId);
-        writer.WriteStringIfNotWhiteSpace("code_file", CodeFile);
+        if (!string.IsNullOrWhiteSpace(Type))
+        {
+            writer.WritePropertyName("type");
+            writer.WriteValue(Type);
+        }
+
+        if (ImageAddress.HasValue)
+        {
+            writer.WritePropertyName("image_addr");
+            writer.WriteValue(ImageAddress.Value.ToHexString());
+        }
+
+        if (ImageSize.HasValue)
+        {
+            writer.WritePropertyName("image_size");
+            writer.WriteValue(ImageSize.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(DebugId))
+        {
+            writer.WritePropertyName("debug_id");
+            writer.WriteValue(DebugId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(DebugChecksum))
+        {
+            writer.WritePropertyName("debug_checksum");
+            writer.WriteValue(DebugChecksum);
+        }
+
+        if (!string.IsNullOrWhiteSpace(DebugFile))
+        {
+            writer.WritePropertyName("debug_file");
+            writer.WriteValue(DebugFile);
+        }
+
+        if (!string.IsNullOrWhiteSpace(CodeId))
+        {
+            writer.WritePropertyName("code_id");
+            writer.WriteValue(CodeId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(CodeFile))
+        {
+            writer.WritePropertyName("code_file");
+            writer.WriteValue(CodeFile);
+        }
 
         writer.WriteEndObject();
     }
@@ -73,16 +114,16 @@ public sealed class DebugImage : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static DebugImage FromJson(JsonElement json)
+    public static DebugImage FromJson(JObject json)
     {
-        var type = json.GetPropertyOrNull("type")?.GetString();
-        var imageAddress = json.GetPropertyOrNull("image_addr")?.GetHexAsLong();
-        var imageSize = json.GetPropertyOrNull("image_size")?.GetInt64();
-        var debugId = json.GetPropertyOrNull("debug_id")?.GetString();
-        var debugChecksum = json.GetPropertyOrNull("debug_checksum")?.GetString();
-        var debugFile = json.GetPropertyOrNull("debug_file")?.GetString();
-        var codeId = json.GetPropertyOrNull("code_id")?.GetString();
-        var codeFile = json.GetPropertyOrNull("code_file")?.GetString();
+        var type = json["type"]?.Value<string>();
+        var imageAddress = json["image_addr"]?.Value<string>()?.GetHexAsLong();
+        var imageSize = json["image_size"]?.Value<long>();
+        var debugId = json["debug_id"]?.Value<string>();
+        var debugChecksum = json["debug_checksum"]?.Value<string>();
+        var debugFile = json["debug_file"]?.Value<string>();
+        var codeId = json["code_id"]?.Value<string>();
+        var codeFile = json["code_file"]?.Value<string>();
 
         return new DebugImage
         {

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -178,50 +180,125 @@ public sealed class Gpu : ISentryJsonSerializable, ICloneable<Gpu>, IUpdatable<G
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", Type);
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteNumberIfNotNull("id", Id);
-        writer.WriteStringIfNotWhiteSpace("vendor_id", VendorId);
-        writer.WriteStringIfNotWhiteSpace("vendor_name", VendorName);
-        writer.WriteNumberIfNotNull("memory_size", MemorySize);
-        writer.WriteStringIfNotWhiteSpace("api_type", ApiType);
-        writer.WriteBooleanIfNotNull("multi_threaded_rendering", MultiThreadedRendering);
-        writer.WriteStringIfNotWhiteSpace("version", Version);
-        writer.WriteStringIfNotWhiteSpace("npot_support", NpotSupport);
-        writer.WriteNumberIfNotNull("max_texture_size", MaxTextureSize);
-        writer.WriteStringIfNotWhiteSpace("graphics_shader_level", GraphicsShaderLevel);
-        writer.WriteBooleanIfNotNull("supports_draw_call_instancing", SupportsDrawCallInstancing);
-        writer.WriteBooleanIfNotNull("supports_ray_tracing", SupportsRayTracing);
-        writer.WriteBooleanIfNotNull("supports_compute_shaders", SupportsComputeShaders);
-        writer.WriteBooleanIfNotNull("supports_geometry_shaders", SupportsGeometryShaders);
+        writer.WritePropertyName("type");
+        writer.WriteValue(Type);
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("name");
+            writer.WriteValue(Name);
+        }
+
+        if (Id.HasValue)
+        {
+            writer.WritePropertyName("id");
+            writer.WriteValue(Id.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(VendorId))
+        {
+            writer.WritePropertyName("vendor_id");
+            writer.WriteValue(VendorId);
+        }
+
+        if (!string.IsNullOrWhiteSpace(VendorName))
+        {
+            writer.WritePropertyName("vendor_name");
+            writer.WriteValue(VendorName);
+        }
+
+        if (MemorySize.HasValue)
+        {
+            writer.WritePropertyName("memory_size");
+            writer.WriteValue(MemorySize.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ApiType))
+        {
+            writer.WritePropertyName("api_type");
+            writer.WriteValue(ApiType);
+        }
+
+        if (MultiThreadedRendering.HasValue)
+        {
+            writer.WritePropertyName("multi_threaded_rendering");
+            writer.WriteValue(MultiThreadedRendering.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Version))
+        {
+            writer.WritePropertyName("version");
+            writer.WriteValue(Version);
+        }
+
+        if (!string.IsNullOrWhiteSpace(NpotSupport))
+        {
+            writer.WritePropertyName("npot_support");
+            writer.WriteValue(NpotSupport);
+        }
+
+        if (MaxTextureSize.HasValue)
+        {
+            writer.WritePropertyName("max_texture_size");
+            writer.WriteValue(MaxTextureSize.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(GraphicsShaderLevel))
+        {
+            writer.WritePropertyName("graphics_shader_level");
+            writer.WriteValue(GraphicsShaderLevel);
+        }
+
+        if (SupportsDrawCallInstancing.HasValue)
+        {
+            writer.WritePropertyName("supports_draw_call_instancing");
+            writer.WriteValue(SupportsDrawCallInstancing.Value);
+        }
+
+        if (SupportsRayTracing.HasValue)
+        {
+            writer.WritePropertyName("supports_ray_tracing");
+            writer.WriteValue(SupportsRayTracing.Value);
+        }
+
+        if (SupportsComputeShaders.HasValue)
+        {
+            writer.WritePropertyName("supports_compute_shaders");
+            writer.WriteValue(SupportsComputeShaders.Value);
+        }
+
+        if (SupportsGeometryShaders.HasValue)
+        {
+            writer.WritePropertyName("supports_geometry_shaders");
+            writer.WriteValue(SupportsGeometryShaders.Value);
+        }
 
         writer.WriteEndObject();
     }
-
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Gpu FromJson(JsonElement json)
+public static Gpu FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var id = json.GetPropertyOrNull("id")?.GetInt32();
-        var vendorId = json.GetPropertyOrNull("vendor_id")?.GetString();
-        var vendorName = json.GetPropertyOrNull("vendor_name")?.GetString();
-        var memorySize = json.GetPropertyOrNull("memory_size")?.GetInt32();
-        var apiType = json.GetPropertyOrNull("api_type")?.GetString();
-        var multiThreadedRendering = json.GetPropertyOrNull("multi_threaded_rendering")?.GetBoolean();
-        var version = json.GetPropertyOrNull("version")?.GetString();
-        var npotSupport = json.GetPropertyOrNull("npot_support")?.GetString();
-        var maxTextureSize = json.GetPropertyOrNull("max_texture_size")?.GetInt32();
-        var graphicsShaderLevel = json.GetPropertyOrNull("graphics_shader_level")?.GetString();
-        var supportsDrawCallInstancing = json.GetPropertyOrNull("supports_draw_call_instancing")?.GetBoolean();
-        var supportsRayTracing = json.GetPropertyOrNull("supports_ray_tracing")?.GetBoolean();
-        var supportsComputeShaders = json.GetPropertyOrNull("supports_compute_shaders")?.GetBoolean();
-        var supportsGeometryShaders = json.GetPropertyOrNull("supports_geometry_shaders")?.GetBoolean();
+    var name = json["name"]?.Value<string>();
+    var id = json["id"]?.Value<int?>();
+    var vendorId = json["vendor_id"]?.Value<string>();
+    var vendorName = json["vendor_name"]?.Value<string>();
+    var memorySize = json["memory_size"]?.Value<int?>();
+    var apiType = json["api_type"]?.Value<string>();
+    var multiThreadedRendering = json["multi_threaded_rendering"]?.Value<bool?>();
+    var version = json["version"]?.Value<string>();
+    var npotSupport = json["npot_support"]?.Value<string>();
+    var maxTextureSize = json["max_texture_size"]?.Value<int?>();
+    var graphicsShaderLevel = json["graphics_shader_level"]?.Value<string>();
+    var supportsDrawCallInstancing = json["supports_draw_call_instancing"]?.Value<bool?>();
+    var supportsRayTracing = json["supports_ray_tracing"]?.Value<bool?>();
+    var supportsComputeShaders = json["supports_compute_shaders"]?.Value<bool?>();
+    var supportsGeometryShaders = json["supports_geometry_shaders"]?.Value<bool?>();
 
         return new Gpu
         {

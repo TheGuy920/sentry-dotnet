@@ -1,7 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.Json;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -152,35 +150,155 @@ public sealed class SentryStackFrame : ISentryJsonSerializable
     public long? FunctionId { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
         if (IsCodeLocation)
         {
             // See https://develop.sentry.dev/sdk/metrics/#meta-data
-            writer.WriteString("type", "location");
+            writer.WritePropertyName("type");
+            writer.WriteValue("location");
         }
 
-        writer.WriteStringArrayIfNotEmpty("pre_context", InternalPreContext);
-        writer.WriteStringArrayIfNotEmpty("post_context", InternalPostContext);
-        writer.WriteStringDictionaryIfNotEmpty("vars", InternalVars!);
-        writer.WriteArrayIfNotEmpty("frames_omitted", InternalFramesOmitted?.Cast<object>(), logger);
-        writer.WriteStringIfNotWhiteSpace("filename", FileName);
-        writer.WriteStringIfNotWhiteSpace("function", Function);
-        writer.WriteStringIfNotWhiteSpace("module", Module);
-        writer.WriteNumberIfNotNull("lineno", LineNumber);
-        writer.WriteNumberIfNotNull("colno", ColumnNumber);
-        writer.WriteStringIfNotWhiteSpace("abs_path", AbsolutePath);
-        writer.WriteStringIfNotWhiteSpace("context_line", ContextLine);
-        writer.WriteBooleanIfNotNull("in_app", InApp);
-        writer.WriteStringIfNotWhiteSpace("package", Package);
-        writer.WriteStringIfNotWhiteSpace("platform", Platform);
-        writer.WriteStringIfNotWhiteSpace("image_addr", ImageAddress?.NullIfDefault()?.ToHexString());
-        writer.WriteStringIfNotWhiteSpace("symbol_addr", SymbolAddress?.NullIfDefault()?.ToHexString());
-        writer.WriteStringIfNotWhiteSpace("instruction_addr", InstructionAddress?.ToHexString());
-        writer.WriteStringIfNotWhiteSpace("addr_mode", AddressMode);
-        writer.WriteStringIfNotWhiteSpace("function_id", FunctionId?.ToHexString());
+        if (InternalPreContext?.Count > 0)
+        {
+            writer.WritePropertyName("pre_context");
+            writer.WriteStartArray();
+            foreach (var item in InternalPreContext)
+            {
+                writer.WriteValue(item);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (InternalPostContext?.Count > 0)
+        {
+            writer.WritePropertyName("post_context");
+            writer.WriteStartArray();
+            foreach (var item in InternalPostContext)
+            {
+                writer.WriteValue(item);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (InternalVars?.Count > 0)
+        {
+            writer.WritePropertyName("vars");
+            writer.WriteStartObject();
+            foreach (var kv in InternalVars)
+            {
+                writer.WritePropertyName(kv.Key);
+                writer.WriteValue(kv.Value);
+            }
+            writer.WriteEndObject();
+        }
+
+        if (InternalFramesOmitted?.Count > 0)
+        {
+            writer.WritePropertyName("frames_omitted");
+            writer.WriteStartArray();
+            foreach (var item in InternalFramesOmitted)
+            {
+                writer.WriteValue(item);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (!string.IsNullOrWhiteSpace(FileName))
+        {
+            writer.WritePropertyName("filename");
+            writer.WriteValue(FileName);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Function))
+        {
+            writer.WritePropertyName("function");
+            writer.WriteValue(Function);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Module))
+        {
+            writer.WritePropertyName("module");
+            writer.WriteValue(Module);
+        }
+
+        if (LineNumber.HasValue)
+        {
+            writer.WritePropertyName("lineno");
+            writer.WriteValue(LineNumber.Value);
+        }
+
+        if (ColumnNumber.HasValue)
+        {
+            writer.WritePropertyName("colno");
+            writer.WriteValue(ColumnNumber.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(AbsolutePath))
+        {
+            writer.WritePropertyName("abs_path");
+            writer.WriteValue(AbsolutePath);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ContextLine))
+        {
+            writer.WritePropertyName("context_line");
+            writer.WriteValue(ContextLine);
+        }
+
+        if (InApp.HasValue)
+        {
+            writer.WritePropertyName("in_app");
+            writer.WriteValue(InApp.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Package))
+        {
+            writer.WritePropertyName("package");
+            writer.WriteValue(Package);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Platform))
+        {
+            writer.WritePropertyName("platform");
+            writer.WriteValue(Platform);
+        }
+
+        var imageAddrStr = ImageAddress?.NullIfDefault()?.ToHexString();
+        if (!string.IsNullOrWhiteSpace(imageAddrStr))
+        {
+            writer.WritePropertyName("image_addr");
+            writer.WriteValue(imageAddrStr);
+        }
+
+        var symbolAddrStr = SymbolAddress?.NullIfDefault()?.ToHexString();
+        if (!string.IsNullOrWhiteSpace(symbolAddrStr))
+        {
+            writer.WritePropertyName("symbol_addr");
+            writer.WriteValue(symbolAddrStr);
+        }
+
+        var instructionAddrStr = InstructionAddress?.ToHexString();
+        if (!string.IsNullOrWhiteSpace(instructionAddrStr))
+        {
+            writer.WritePropertyName("instruction_addr");
+            writer.WriteValue(instructionAddrStr);
+        }
+
+        if (!string.IsNullOrWhiteSpace(AddressMode))
+        {
+            writer.WritePropertyName("addr_mode");
+            writer.WriteValue(AddressMode);
+        }
+
+        var functionIdStr = FunctionId?.ToHexString();
+        if (!string.IsNullOrWhiteSpace(functionIdStr))
+        {
+            writer.WritePropertyName("function_id");
+            writer.WriteValue(functionIdStr);
+        }
 
         writer.WriteEndObject();
     }
@@ -218,33 +336,33 @@ public sealed class SentryStackFrame : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryStackFrame FromJson(JsonElement json)
+    public static SentryStackFrame FromJson(JToken json)
     {
-        var preContext = json.GetPropertyOrNull("pre_context")?.EnumerateArray().Select(j => j.GetString()).ToList();
-        var postContext = json.GetPropertyOrNull("post_context")?.EnumerateArray().Select(j => j.GetString()).ToList();
-        var vars = json.GetPropertyOrNull("vars")?.GetStringDictionaryOrNull();
-        var framesOmitted = json.GetPropertyOrNull("frames_omitted")?.EnumerateArray().Select(j => j.GetInt32()).ToList();
-        var filename = json.GetPropertyOrNull("filename")?.GetString();
-        var function = json.GetPropertyOrNull("function")?.GetString();
-        var module = json.GetPropertyOrNull("module")?.GetString();
-        var lineNumber = json.GetPropertyOrNull("lineno")?.GetInt32();
-        var columnNumber = json.GetPropertyOrNull("colno")?.GetInt32();
-        var absolutePath = json.GetPropertyOrNull("abs_path")?.GetString();
-        var contextLine = json.GetPropertyOrNull("context_line")?.GetString();
-        var inApp = json.GetPropertyOrNull("in_app")?.GetBoolean();
-        var package = json.GetPropertyOrNull("package")?.GetString();
-        var platform = json.GetPropertyOrNull("platform")?.GetString();
-        var imageAddress = json.GetPropertyOrNull("image_addr")?.GetHexAsLong();
-        var symbolAddress = json.GetPropertyOrNull("symbol_addr")?.GetHexAsLong();
-        var instructionAddress = json.GetPropertyOrNull("instruction_addr")?.GetHexAsLong();
-        var addressMode = json.GetPropertyOrNull("addr_mode")?.GetString();
-        var functionId = json.GetPropertyOrNull("function_id")?.GetHexAsLong();
+        var preContext = json["pre_context"]?.ToObject<List<string>>();
+        var postContext = json["post_context"]?.ToObject<List<string>>();
+        var vars = json["vars"]?.ToObject<Dictionary<string, string>>();
+        var framesOmitted = json["frames_omitted"]?.ToObject<List<int>>();
+        var filename = json["filename"]?.Value<string>();
+        var function = json["function"]?.Value<string>();
+        var module = json["module"]?.Value<string>();
+        var lineNumber = json["lineno"]?.Value<int>();
+        var columnNumber = json["colno"]?.Value<int>();
+        var absolutePath = json["abs_path"]?.Value<string>();
+        var contextLine = json["context_line"]?.Value<string>();
+        var inApp = json["in_app"]?.Value<bool>();
+        var package = json["package"]?.Value<string>();
+        var platform = json["platform"]?.Value<string>();
+        var imageAddress = json["image_addr"]?.Value<string>()?.GetHexAsLong();
+        var symbolAddress = json["symbol_addr"]?.Value<string>()?.GetHexAsLong();
+        var instructionAddress = json["instruction_addr"]?.Value<string>()?.GetHexAsLong();
+        var addressMode = json["addr_mode"]?.Value<string>();
+        var functionId = json["function_id"]?.Value<string>()?.GetHexAsLong();
 
         return new SentryStackFrame
         {
-            InternalPreContext = preContext!,
-            InternalPostContext = postContext!,
-            InternalVars = vars?.WhereNotNullValue().ToDict(),
+            InternalPreContext = preContext,
+            InternalPostContext = postContext,
+            InternalVars = vars?.Where(kv => kv.Value != null).ToDictionary(kv => kv.Key, kv => kv.Value),
             InternalFramesOmitted = framesOmitted,
             FileName = filename,
             Function = function,

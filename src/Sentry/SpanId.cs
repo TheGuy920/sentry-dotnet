@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 
@@ -67,10 +69,10 @@ public readonly struct SpanId : IEquatable<SpanId>, ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? _)
     {
         Span<byte> convertedBytes = stackalloc byte[sizeof(long)];
-        Unsafe.As<byte, long>(ref convertedBytes[0]) = _value;
+        BitConverter.TryWriteBytes(convertedBytes, _value);
 
         // Going backwards through the array to preserve the order of the output hex string (i.e. `4e76` -> `76e4`)
         Span<char> output = stackalloc char[16];
@@ -81,7 +83,7 @@ public readonly struct SpanId : IEquatable<SpanId>, ISentryJsonSerializable
             output[(convertedBytes.Length - 1 - i) * 2 + 1] = HexChars[value & 0xF];
         }
 
-        writer.WriteStringValue(output);
+        writer.WriteValue(output.ToString());
     }
 
     /// <summary>
@@ -92,9 +94,9 @@ public readonly struct SpanId : IEquatable<SpanId>, ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SpanId FromJson(JsonElement json)
+    public static SpanId FromJson(JToken json)
     {
-        var value = json.GetString();
+        var value = json.Value<string>();
 
         return !string.IsNullOrWhiteSpace(value)
             ? Parse(value)

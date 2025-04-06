@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -134,64 +136,72 @@ public sealed class SentryContexts : IDictionary<string, object>, ISentryJsonSer
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         var contexts = this.OrderBy(x => x.Key, StringComparer.Ordinal);
-        writer.WriteDictionaryValue(contexts!, logger, includeNullValues: false);
+        writer.WriteStartObject();
+        foreach (var context in contexts)
+        {
+            writer.WritePropertyName(context.Key);
+            JsonSerializer.CreateDefault().Serialize(writer, context.Value);
+        }
+        writer.WriteEndObject();
     }
 
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryContexts FromJson(JsonElement json)
+    public static SentryContexts FromJson(JToken json)
     {
         var result = new SentryContexts();
 
-        foreach (var (name, value) in json.EnumerateObject())
+        foreach (var property in ((JObject)json).Properties())
         {
-            var type = value.GetPropertyOrNull("type")?.GetString() ?? name;
+            var name = property.Name;
+            var value = property.Value;
+            var type = value["type"]?.Value<string>() ?? name;
 
             // Handle known context types
             if (string.Equals(type, App.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = App.FromJson(value);
+                result[name] = value.ToObject<App>()!;
             }
             else if (string.Equals(type, Browser.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = Browser.FromJson(value);
+                result[name] = value.ToObject<Browser>()!;
             }
             else if (string.Equals(type, Device.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = Device.FromJson(value);
+                result[name] = value.ToObject<Device>()!;
             }
             else if (string.Equals(type, SentryFeedback.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = SentryFeedback.FromJson(value);
+                result[name] = value.ToObject<SentryFeedback>()!;
             }
             else if (string.Equals(type, OperatingSystem.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = OperatingSystem.FromJson(value);
+                result[name] = value.ToObject<OperatingSystem>()!;
             }
             else if (string.Equals(type, Response.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = Response.FromJson(value);
+                result[name] = value.ToObject<Response>()!;
             }
             else if (string.Equals(type, Runtime.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = Runtime.FromJson(value);
+                result[name] = value.ToObject<Runtime>()!;
             }
             else if (string.Equals(type, Gpu.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = Gpu.FromJson(value);
+                result[name] = value.ToObject<Gpu>()!;
             }
             else if (string.Equals(type, Trace.Type, StringComparison.OrdinalIgnoreCase))
             {
-                result[name] = Trace.FromJson(value);
+                result[name] = value.ToObject<Trace>()!;
             }
             else
             {
                 // Unknown context - parse as dictionary
-                var dynamicContext = value.GetDynamicOrNull();
+                var dynamicContext = value.ToObject<Dictionary<string, object>>();
                 if (dynamicContext is not null)
                 {
                     result[name] = dynamicContext;

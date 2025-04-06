@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -173,26 +174,41 @@ public partial class SentryMonitorOptions : ISentryJsonSerializable
     internal SentryMonitorOptions() { }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         Debug.Assert(_type != SentryMonitorScheduleType.None, "The Monitor Options do not contain a valid interval." +
                                                               "Please update your monitor options by setting the Interval.");
 
-        writer.WriteStartObject("monitor_config");
-        writer.WriteStartObject("schedule");
+        writer.WritePropertyName("monitor_config");
+        writer.WriteStartObject();
+        writer.WritePropertyName("schedule");
+        writer.WriteStartObject();
 
-        writer.WriteString("type", TypeToString(_type));
+        writer.WritePropertyName("type");
+        writer.WriteValue(TypeToString(_type));
         switch (_type)
         {
             case SentryMonitorScheduleType.Crontab:
                 Debug.Assert(!string.IsNullOrEmpty(_crontab), "The provided 'crontab' cannot be an empty string.");
-                writer.WriteStringIfNotWhiteSpace("value", _crontab);
+                if (!string.IsNullOrWhiteSpace(_crontab))
+                {
+                    writer.WritePropertyName("value");
+                    writer.WriteValue(_crontab);
+                }
                 break;
             case SentryMonitorScheduleType.Interval:
                 Debug.Assert(_interval != null, "The provided 'interval' cannot be null.");
-                writer.WriteNumberIfNotNull("value", _interval);
+                if (_interval.HasValue)
+                {
+                    writer.WritePropertyName("value");
+                    writer.WriteValue(_interval.Value);
+                }
                 Debug.Assert(_unit != null, "The provided 'unit' cannot be null.");
-                writer.WriteStringIfNotWhiteSpace("unit", _unit.ToString()!.ToLower());
+                if (_unit != null)
+                {
+                    writer.WritePropertyName("unit");
+                    writer.WriteValue(_unit.ToString()!.ToLower());
+                }
                 break;
             default:
                 logger?.LogError("Invalid MonitorScheduleType: '{0}'", _type.ToString());
@@ -201,12 +217,36 @@ public partial class SentryMonitorOptions : ISentryJsonSerializable
 
         writer.WriteEndObject();
 
-        writer.WriteNumberIfNotNull("checkin_margin", CheckInMargin?.TotalMinutes);
-        writer.WriteNumberIfNotNull("max_runtime", MaxRuntime?.TotalMinutes);
-        writer.WriteNumberIfNotNull("failure_issue_threshold", FailureIssueThreshold);
-        writer.WriteNumberIfNotNull("recovery_threshold", RecoveryThreshold);
-        writer.WriteStringIfNotWhiteSpace("timezone", TimeZone);
-        writer.WriteStringIfNotWhiteSpace("owner", Owner);
+        if (CheckInMargin.HasValue)
+        {
+            writer.WritePropertyName("checkin_margin");
+            writer.WriteValue(CheckInMargin.Value.TotalMinutes);
+        }
+        if (MaxRuntime.HasValue)
+        {
+            writer.WritePropertyName("max_runtime");
+            writer.WriteValue(MaxRuntime.Value.TotalMinutes);
+        }
+        if (FailureIssueThreshold.HasValue)
+        {
+            writer.WritePropertyName("failure_issue_threshold");
+            writer.WriteValue(FailureIssueThreshold.Value);
+        }
+        if (RecoveryThreshold.HasValue)
+        {
+            writer.WritePropertyName("recovery_threshold");
+            writer.WriteValue(RecoveryThreshold.Value);
+        }
+        if (!string.IsNullOrWhiteSpace(TimeZone))
+        {
+            writer.WritePropertyName("timezone");
+            writer.WriteValue(TimeZone);
+        }
+        if (!string.IsNullOrWhiteSpace(Owner))
+        {
+            writer.WritePropertyName("owner");
+            writer.WriteValue(Owner);
+        }
 
         writer.WriteEndObject();
     }

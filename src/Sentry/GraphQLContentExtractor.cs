@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 
 namespace Sentry;
@@ -10,10 +11,10 @@ internal static class GraphQLContentExtractor
         return json is not null ? new GraphQLRequestContent(json, options) : null;
     }
 
-    internal static async Task<JsonElement?> ExtractResponseContentAsync(HttpResponseMessage response, SentryOptions? options)
+    internal static async Task<JToken?> ExtractResponseContentAsync(HttpResponseMessage response, SentryOptions? options)
     {
         var json = await ExtractContentAsync(response?.Content, options).ConfigureAwait(false);
-        return (json is not null) ? JsonDocument.Parse(json).RootElement.Clone() : null;
+        return (json is not null) ? JToken.Parse(json) : null;
     }
 
     private static void TrySeek(Stream? stream, long position)

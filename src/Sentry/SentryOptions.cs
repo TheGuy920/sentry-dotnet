@@ -1102,17 +1102,17 @@ public class SentryOptions
     public bool DisableSentryHttpMessageHandler { get; set; } = false;
 
     /// <summary>
-    /// Adds a <see cref="JsonConverter"/> to be used when serializing or deserializing
+    /// Adds a <see cref="Newtonsoft.Json.JsonConverter"/> to be used when serializing or deserializing
     /// objects to JSON with this SDK.  For example, when custom context data might use
     /// a data type that requires custom serialization logic.
     /// </summary>
-    /// <param name="converter">The <see cref="JsonConverter"/> to add.</param>
+    /// <param name="converter">The <see cref="Newtonsoft.Json.JsonConverter"/> to add.</param>
     /// <remarks>
     /// This currently modifies a static list, so will affect any instance of the Sentry SDK.
     /// If that becomes problematic, we will have to refactor all serialization code to be
     /// able to accept an instance of <see cref="SentryOptions"/>.
     /// </remarks>
-    public void AddJsonConverter(JsonConverter converter)
+    public void AddJsonConverter(Newtonsoft.Json.JsonConverter converter)
     {
         // protect against null because user may not have nullability annotations enabled
         if (converter == null!)
@@ -1124,33 +1124,32 @@ public class SentryOptions
     }
 
     /// <summary>
-    /// Configures a custom <see cref="JsonSerializerContext"/> to be used when serializing or deserializing
+    /// Configures custom JSON serialization settings to be used when serializing or deserializing
     /// objects to JSON with this SDK.
     /// </summary>
-    /// <param name="contextBuilder">
-    /// A builder that takes <see cref="JsonSerializerOptions"/> and returns a <see cref="JsonSerializerContext"/>
+    /// <param name="configureSettings">
+    /// A callback that configures the <see cref="Newtonsoft.Json.JsonSerializerSettings"/>
     /// </param>
     /// <remarks>
-    /// This currently modifies a static list, so will affect any instance of the Sentry SDK.
+    /// This currently modifies a static settings object, so will affect any instance of the Sentry SDK.
     /// If that becomes problematic, we will have to refactor all serialization code to be
     /// able to accept an instance of <see cref="SentryOptions"/>.
     /// </remarks>
-    public void AddJsonSerializerContext<T>(Func<JsonSerializerOptions, T> contextBuilder)
-        where T : JsonSerializerContext
+    public void ConfigureJsonSettings(Action<Newtonsoft.Json.JsonSerializerSettings> configureSettings)
     {
         // protect against null because user may not have nullability annotations enabled
-        if (contextBuilder == null!)
+        if (configureSettings == null!)
         {
-            throw new ArgumentNullException(nameof(contextBuilder));
+            throw new ArgumentNullException(nameof(configureSettings));
         }
 
-        JsonExtensions.AddJsonSerializerContext(contextBuilder);
+        JsonExtensions.ConfigureJsonSettings(configureSettings);
     }
 
     /// <summary>
     /// When <c>true</c>, if an object being serialized to JSON contains references to other objects, and the
-    /// serialized object graph exceed the maximum allowable depth, the object will instead be serialized using
-    /// <see cref="ReferenceHandler.Preserve"/> (from System.Text.Json) - which adds <c>$id</c> and <c>$ref</c>
+    /// serialized object graph exceeds the maximum allowable depth, the object will preserve references
+    /// by using Newtonsoft's reference handling - which adds <c>$id</c> and <c>$ref</c>
     /// metadata to the JSON.  When <c>false</c>, an object graph exceeding the maximum depth will be truncated.
     /// The default value is <c>true</c>.
     /// </summary>

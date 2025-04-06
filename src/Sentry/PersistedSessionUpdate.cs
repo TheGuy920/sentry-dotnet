@@ -1,9 +1,10 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
-using Sentry.Internal.Extensions;
 
 namespace Sentry;
 
-internal class PersistedSessionUpdate : ISentryJsonSerializable
+internal class PersistedSessionUpdate
 {
     public SessionUpdate Update { get; }
 
@@ -15,24 +16,26 @@ internal class PersistedSessionUpdate : ISentryJsonSerializable
         PauseTimestamp = pauseTimestamp;
     }
 
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteSerializable("update", Update, logger);
+        writer.WritePropertyName("update");
+        Update.WriteTo(writer, logger);
 
         if (PauseTimestamp is { } pauseTimestamp)
         {
-            writer.WriteString("paused", pauseTimestamp);
+            writer.WritePropertyName("paused");
+            writer.WriteValue(pauseTimestamp);
         }
 
         writer.WriteEndObject();
     }
 
-    public static PersistedSessionUpdate FromJson(JsonElement json)
+    public static PersistedSessionUpdate FromJson(JToken json)
     {
-        var update = SessionUpdate.FromJson(json.GetProperty("update"));
-        var pauseTimestamp = json.GetPropertyOrNull("paused")?.GetDateTimeOffset();
+        var update = SessionUpdate.FromJson((json["update"] as JObject)!);
+        var pauseTimestamp = json["paused"]?.ToObject<DateTimeOffset?>();
 
         return new PersistedSessionUpdate(update, pauseTimestamp);
     }

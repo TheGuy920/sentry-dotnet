@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -28,13 +29,18 @@ namespace Sentry
         }
 
         /// <inheritdoc />
-        public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+        public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
         {
             writer.WriteStartObject();
 
-            writer.WriteStringIfNotWhiteSpace("rendering_system", RenderingSystem);
+            if (!string.IsNullOrWhiteSpace(RenderingSystem))
+            {
+                writer.WritePropertyName("rendering_system");
+                writer.WriteValue(RenderingSystem);
+            }
 
-            writer.WriteStartArray("windows");
+            writer.WritePropertyName("windows");
+            writer.WriteStartArray();
             foreach (var window in Windows)
             {
                 window.WriteTo(writer, logger);

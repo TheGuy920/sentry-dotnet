@@ -1,3 +1,7 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json.Serialization;
+using System.Globalization;
 using Sentry.Extensibility;
 using Sentry.Internal.JsonConverters;
 
@@ -23,38 +27,40 @@ internal static class JsonExtensions
         ResetSerializerOptions();
     }
 
-    private static JsonSerializerOptions BuildOptions(bool preserveReferences)
+    private static JsonSerializerSettings BuildOptions(bool preserveReferences)
     {
-        var options = new JsonSerializerOptions();
-        if (preserveReferences)
+        var settings = new JsonSerializerSettings
         {
-            options.ReferenceHandler = ReferenceHandler.Preserve;
-        }
+            PreserveReferencesHandling = preserveReferences ?
+                PreserveReferencesHandling.Objects :
+                PreserveReferencesHandling.None
+        };
+
         foreach (var converter in DefaultConverters)
         {
-            options.Converters.Add(converter);
+            settings.Converters.Add(converter);
         }
         foreach (var converter in CustomConverters)
         {
-            options.Converters.Add(converter);
+            settings.Converters.Add(converter);
         }
 
-        return options;
+        return settings;
     }
 
-    private static JsonSerializerOptions SerializerOptions = null!;
-    private static JsonSerializerOptions AltSerializerOptions = null!;
+    private static JsonSerializerSettings SerializerSettings = null!;
+    private static JsonSerializerSettings AltSerializerSettings = null!;
 
-    private static List<JsonSerializerContext> DefaultSerializerContexts = new();
-    private static List<JsonSerializerContext> ReferencePreservingSerializerContexts = new();
+    private static List<SentryJsonContext> DefaultSerializerContexts = new();
+    private static List<SentryJsonContext> ReferencePreservingSerializerContexts = new();
 
-    private static List<Func<JsonSerializerOptions, JsonSerializerContext>> JsonSerializerContextBuilders = new()
+    private static List<Func<JsonSerializerSettings, SentryJsonContext>> JsonSerializerContextBuilders = new()
     {
-        options => new SentryJsonContext(options)
+        settings => new SentryJsonContext(settings)
     };
 
-    internal static void AddJsonSerializerContext<T>(Func<JsonSerializerOptions, T> jsonSerializerContextBuilder)
-        where T : JsonSerializerContext
+    internal static void AddJsonSerializerContext<T>(Func<JsonSerializerSettings, T> jsonSerializerContextBuilder)
+        where T : SentryJsonContext
     {
         JsonSerializerContextBuilders.Add(jsonSerializerContextBuilder);
         ResetSerializerOptions();
@@ -63,8 +69,8 @@ internal static class JsonExtensions
     internal static void ResetSerializerOptions()
     {
         // For our classic reflection based serialization
-        SerializerOptions = BuildOptions(false);
-        AltSerializerOptions = BuildOptions(true);
+        SerializerSettings = BuildOptions(false);
+        AltSerializerSettings = BuildOptions(true);
 
         // For the new AOT serialization
         DefaultSerializerContexts.Clear();
@@ -102,103 +108,97 @@ internal static class JsonExtensions
         }
     }
 
-    public static void Deconstruct(this JsonProperty jsonProperty, out string name, out JsonElement value)
+    public static Dictionary<string, object?>? GetDictionaryOrNull(this JToken json)
     {
-        name = jsonProperty.Name;
-        value = jsonProperty.Value;
-    }
-
-    public static Dictionary<string, object?>? GetDictionaryOrNull(this JsonElement json)
-    {
-        if (json.ValueKind != JsonValueKind.Object)
+        if (json.Type != JTokenType.Object)
         {
             return null;
         }
 
         var result = new Dictionary<string, object?>();
 
-        foreach (var (name, value) in json.EnumerateObject())
+        foreach (var prop in ((JObject)json).Properties())
         {
-            result[name] = value.GetDynamicOrNull();
+            result[prop.Name] = prop.Value?.GetDynamicOrNull();
         }
 
         return result;
     }
 
     public static Dictionary<string, TValue>? GetDictionaryOrNull<TValue>(
-        this JsonElement json,
-        Func<JsonElement, TValue> factory)
+        this JToken json,
+        Func<JToken, TValue> factory)
         where TValue : ISentryJsonSerializable?
     {
-        if (json.ValueKind != JsonValueKind.Object)
+        if (json.Type != JTokenType.Object)
         {
             return null;
         }
 
         var result = new Dictionary<string, TValue>();
 
-        foreach (var (name, value) in json.EnumerateObject())
+        foreach (var prop in ((JObject)json).Properties())
         {
-            result[name] = factory(value);
+            result[prop.Name] = factory(prop.Value);
         }
 
         return result;
     }
 
-    public static Dictionary<string, string?>? GetStringDictionaryOrNull(this JsonElement json)
+    public static Dictionary<string, string?>? GetStringDictionaryOrNull(this JToken json)
     {
-        if (json.ValueKind != JsonValueKind.Object)
+        if (json.Type != JTokenType.Object)
         {
             return null;
         }
 
         var result = new Dictionary<string, string?>(StringComparer.Ordinal);
 
-        foreach (var (name, value) in json.EnumerateObject())
+        foreach (var prop in ((JObject)json).Properties())
         {
-            if (value.ValueKind == JsonValueKind.String)
+            if (prop.Value?.Type == JTokenType.String)
             {
-                result[name] = value.GetString();
+                result[prop.Name] = prop.Value.ToString();
             }
             else
             {
-                result[name] = value.ToString();
+                result[prop.Name] = prop.Value?.ToString();
             }
         }
 
         return result;
     }
 
-    public static JsonElement? GetPropertyOrNull(this JsonElement json, string name)
+    public static JToken? GetPropertyOrNull(this JToken json, string name)
     {
-        if (json.ValueKind != JsonValueKind.Object)
+        if (json.Type != JTokenType.Object)
         {
             return null;
         }
 
-        if (json.TryGetProperty(name, out var result) &&
-            result.ValueKind is not JsonValueKind.Undefined and not JsonValueKind.Null)
+        var property = ((JObject)json)[name];
+        if (property != null && property.Type != JTokenType.Null)
         {
-            return result;
+            return property;
         }
 
         return null;
     }
 
-    public static object? GetDynamicOrNull(this JsonElement json) => json.ValueKind switch
+    public static object? GetDynamicOrNull(this JToken json) => json.Type switch
     {
-        JsonValueKind.True => true,
-        JsonValueKind.False => false,
-        JsonValueKind.Number => json.GetNumber(), // see implementation for why we don't just call GetDouble
-        JsonValueKind.String => json.GetString(),
-        JsonValueKind.Array => json.EnumerateArray().Select(GetDynamicOrNull).ToArray(),
-        JsonValueKind.Object => json.GetDictionaryOrNull(),
+        JTokenType.Boolean => json.Value<bool>(),
+        JTokenType.Integer => json.Value<long>(),
+        JTokenType.Float => GetNumber(json),
+        JTokenType.String => json.Value<string>(),
+        JTokenType.Array => json.Select(GetDynamicOrNull).ToArray(),
+        JTokenType.Object => json.GetDictionaryOrNull(),
         _ => null
     };
 
-    private static object? GetNumber(this JsonElement json)
+    private static object? GetNumber(this JToken json)
     {
-        var result = json.GetDouble();
+        var result = json.Value<double>();
         if (result != 0)
         {
             // We got a value, as expected.
@@ -210,14 +210,14 @@ internal static class JsonExtensions
         // See https://github.com/getsentry/sentry-unity/issues/690
 
         // If the number is an integer, we can avoid extra string parsing
-        if (json.TryGetInt64(out var longResult))
+        var stringValue = json.ToString();
+        if (long.TryParse(stringValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var longResult))
         {
             return longResult;
         }
 
         // Otherwise, let's get the value as a string and parse it ourselves.
-        // Note that we already know this will succeed due to JsonValueKind.Number
-        return double.Parse(json.ToString()!, CultureInfo.InvariantCulture);
+        return double.Parse(stringValue, CultureInfo.InvariantCulture);
     }
 
     /// <summary>
@@ -226,44 +226,35 @@ internal static class JsonExtensions
     /// <param name="json"></param>
     /// <param name="propertyName"></param>
     /// <returns></returns>
-    public static DateTimeOffset? GetSafeDateTimeOffset(this JsonElement json, string propertyName)
+    public static DateTimeOffset? GetSafeDateTimeOffset(this JToken json, string propertyName)
     {
         DateTimeOffset? result = null;
         var dtRaw = json.GetPropertyOrNull(propertyName);
         if (dtRaw != null)
         {
-            if (dtRaw.Value.ValueKind == JsonValueKind.Number)
+            if (dtRaw.Type == JTokenType.Integer || dtRaw.Type == JTokenType.Float)
             {
-                var epoch = Convert.ToInt64(dtRaw.Value.GetDouble());
+                var epoch = Convert.ToInt64(dtRaw.Value<double>());
                 result = DateTimeOffset.FromUnixTimeSeconds(epoch);
             }
             else
             {
-                result = dtRaw.Value.GetDateTimeOffset();
+                result = dtRaw.Value<DateTimeOffset>();
             }
         }
         return result;
     }
 
-    public static long? GetHexAsLong(this JsonElement json)
+    public static long? GetHexAsLong(this string? s)
     {
-        // If the address is in json as a number, we can just use it.
-        if (json.ValueKind == JsonValueKind.Number)
-        {
-            return json.GetInt64();
-        }
-
-        // Otherwise it will be a string, but we need to convert it to a number.
-        var s = json.GetString();
         if (s == null)
         {
             return null;
         }
 
         // It should be in hex format, such as "0x7fff5bf346c0"
-        var substring = s[2..];
         if (s.StartsWith("0x") &&
-            long.TryParse(substring, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
+            long.TryParse(s[2..], NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var result))
         {
             return result;
         }
@@ -271,11 +262,29 @@ internal static class JsonExtensions
         throw new FormatException();
     }
 
-    public static string GetStringOrThrow(this JsonElement json) =>
-        json.GetString() ?? throw new InvalidOperationException("JSON string is null.");
+    public static long? GetHexAsLong(this JToken json)
+    {
+        // If the address is in json as a number, we can just use it.
+        if (json.Type == JTokenType.Integer)
+        {
+            return json.Value<long>();
+        }
+
+        // Otherwise it will be a string, but we need to convert it to a number.
+        var s = json.Value<string>();
+        if (s == null)
+        {
+            return null;
+        }
+
+        return s.GetHexAsLong();
+    }
+
+    public static string GetStringOrThrow(this JToken json) =>
+        json.Value<string>() ?? throw new InvalidOperationException("JSON string is null.");
 
     public static void WriteDictionaryValue(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         IEnumerable<KeyValuePair<string, object?>>? dic,
         IDiagnosticLogger? logger,
         bool includeNullValues = true)
@@ -311,7 +320,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionaryValue<TValue>(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         IEnumerable<KeyValuePair<string, TValue>>? dic,
         IDiagnosticLogger? logger,
         bool includeNullValues = true)
@@ -342,7 +351,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringDictionaryValue(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         IEnumerable<KeyValuePair<string, string?>>? dic)
     {
         if (dic is not null)
@@ -363,7 +372,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionary(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, object?>>? dic,
         IDiagnosticLogger? logger)
@@ -373,7 +382,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionary<TValue>(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, TValue>>? dic,
         IDiagnosticLogger? logger)
@@ -384,7 +393,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringDictionary(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, string?>>? dic)
     {
@@ -393,7 +402,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteArrayValue<T>(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         IEnumerable<T>? arr,
         IDiagnosticLogger? logger)
     {
@@ -415,7 +424,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteArray<T>(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<T>? arr,
         IDiagnosticLogger? logger)
@@ -425,7 +434,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringArrayValue(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         IEnumerable<string?>? arr)
     {
         if (arr is not null)
@@ -446,7 +455,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringArray(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<string?>? arr)
     {
@@ -455,7 +464,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteSerializableValue(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         ISentryJsonSerializable value,
         IDiagnosticLogger? logger)
     {
@@ -463,7 +472,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteSerializable(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         ISentryJsonSerializable value,
         IDiagnosticLogger? logger)
@@ -473,7 +482,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDynamicValue(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         object? value,
         IDiagnosticLogger? logger)
     {
@@ -525,16 +534,6 @@ internal static class JsonExtensions
         {
             writer.WriteStringValue(timeSpan.ToString("g", CultureInfo.InvariantCulture));
         }
-#if NET6_0_OR_GREATER
-        else if (value is DateOnly date)
-        {
-            writer.WriteStringValue(date.ToString("O", CultureInfo.InvariantCulture));
-        }
-        else if (value is TimeOnly time)
-        {
-            writer.WriteStringValue(time.ToString("HH:mm:ss.FFFFFFF", CultureInfo.InvariantCulture));
-        }
-#endif
         else if (value is IFormattable formattable)
         {
             writer.WriteStringValue(formattable.ToString(null, CultureInfo.InvariantCulture));
@@ -555,7 +554,7 @@ internal static class JsonExtensions
             {
                 // Use an intermediate byte array, so we can retry if serialization fails.
                 var bytes = InternalSerializeToUtf8Bytes(value);
-                writer.WriteRawValue(bytes);
+                writer.WriteRawValue(Encoding.UTF8.GetString(bytes));
             }
             catch (JsonException)
             {
@@ -565,76 +564,103 @@ internal static class JsonExtensions
         }
     }
 
+    public static void WriteNumberValue(
+        this JsonTextWriter writer,
+        long value)
+    {
+        writer.WriteValue(value);
+    }
+
+    public static void WriteNumberValue(
+        this JsonTextWriter writer,
+        double value)
+    {
+        writer.WriteValue(value);
+    }
+
+    public static void WriteStringValue(
+        this JsonTextWriter writer,
+        string? value)
+    {
+        if (value is null)
+        {
+            writer.WriteNullValue();
+        }
+        else
+        {
+            writer.WriteValue(value);
+        }
+    }
+
+    public static void WriteStringValue(
+        this JsonTextWriter writer,
+        DateTime value)
+    {
+        writer.WriteValue(value);
+    }
+
+    public static void WriteStringValue(
+        this JsonTextWriter writer,
+        DateTimeOffset value)
+    {
+        writer.WriteValue(value);
+    }
+
+    public static void WriteBooleanValue(
+        this JsonTextWriter writer,
+        bool value)
+    {
+        writer.WriteValue(value);
+    }
+
+    public static void WriteNullValue(
+        this JsonTextWriter writer)
+    {
+        writer.WriteNull();
+    }
+
     internal static string ToUtf8Json(this object value, bool preserveReferences = false)
     {
         using var stream = new MemoryStream();
-        using var writer = new Utf8JsonWriter(stream);
+        using var writer = new JsonTextWriter(new StreamWriter(stream));
         InternalSerialize(writer, value, preserveReferences);
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
     }
 
-    private static JsonSerializerContext GetSerializerContext(Type type, bool preserveReferences = false)
+    private static JsonSerializerSettings GetSerializerSettings(bool preserveReferences = false)
     {
-        var contexts = preserveReferences ? ReferencePreservingSerializerContexts : DefaultSerializerContexts;
-        return contexts.FirstOrDefault(c => c.GetTypeInfo(type) != null)
-            ?? contexts[0]; // If none of the contexts has type info, this gives us a proper exception message
+        return preserveReferences ? AltSerializerSettings : SerializerSettings;
     }
 
     private static byte[] InternalSerializeToUtf8Bytes(object value)
     {
-#if NET8_0_OR_GREATER
-        byte[] AotSerializeToUtf8Bytes()
-        {
-            var context = GetSerializerContext(value.GetType());
-            return JsonSerializer.SerializeToUtf8Bytes(value, value.GetType(), context);
-        }
-        return JsonSerializer.IsReflectionEnabledByDefault
-            ? JitSerializeToUtf8Bytes()
-            : AotSerializeToUtf8Bytes();
-#else
-        return JitSerializeToUtf8Bytes();
-#endif
+        using var ms = new MemoryStream();
+        using var writer = new StreamWriter(ms, Encoding.UTF8);
+        using var jsonWriter = new JsonTextWriter(writer);
 
-        [UnconditionalSuppressMessage("Trimming", "IL2026: RequiresUnreferencedCode", Justification = AotHelper.AvoidAtRuntime)]
-        [UnconditionalSuppressMessage("AOT", "IL3050: RequiresDynamicCode", Justification = AotHelper.AvoidAtRuntime)]
-        byte[] JitSerializeToUtf8Bytes() => JsonSerializer.SerializeToUtf8Bytes(value, SerializerOptions);
+        var serializer = JsonSerializer.Create(SerializerSettings);
+        serializer.Serialize(jsonWriter, value);
+
+        jsonWriter.Flush();
+        writer.Flush();
+
+        return ms.ToArray();
     }
 
-    private static void InternalSerialize(Utf8JsonWriter writer, object value, bool preserveReferences = false)
+    private static void InternalSerialize(JsonTextWriter writer, object value, bool preserveReferences = false)
     {
-#if NET8_0_OR_GREATER
-        if (JsonSerializer.IsReflectionEnabledByDefault)
-        {
-            JitSerialize();
-        }
-        else
-        {
-            var context = GetSerializerContext(value.GetType(), preserveReferences);
-            JsonSerializer.Serialize(writer, value, value.GetType(), context);
-        }
-#else
-        JitSerialize();
-#endif
-        return;
-
-        [UnconditionalSuppressMessage("AOT", "IL3050: RequiresDynamicCode", Justification = AotHelper.AvoidAtRuntime)]
-        [UnconditionalSuppressMessage("Trimming", "IL2026: RequiresUnreferencedCode", Justification = AotHelper.AvoidAtRuntime)]
-        void JitSerialize()
-        {
-            var options = preserveReferences ? AltSerializerOptions : SerializerOptions;
-            JsonSerializer.Serialize(writer, value, options);
-        }
+        var serializer = JsonSerializer.Create(GetSerializerSettings(preserveReferences));
+        serializer.Serialize(writer, value);
     }
-
     public static void WriteDynamic(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         object? value,
         IDiagnosticLogger? logger)
     {
         writer.WritePropertyName(propertyName);
-        var originalPropertyDepth = writer.CurrentDepth;
+        int originalDepth = GetApproximateDepth(writer);
         try
         {
             writer.WriteDynamicValue(value, logger);
@@ -643,8 +669,8 @@ internal static class JsonExtensions
         {
             // In the event of an instance that can't be serialized, we don't want to throw away a whole event
             // so we'll suppress issues here.
-            logger?.LogError(e, "Failed to serialize object for property '{0}'. Original depth: {1}, current depth: {2}",
-                propertyName, originalPropertyDepth, writer.CurrentDepth);
+            logger?.LogError(e, "Failed to serialize object for property '{0}'.",
+                propertyName);
 
             // The only location in the protocol we allow dynamic objects are Extra and Contexts.
             // Render an empty JSON object instead of null. This allows a round trip where this property name is the
@@ -660,18 +686,26 @@ internal static class JsonExtensions
             }
             catch (InvalidOperationException)
             {
+                // Already in an object, just write an empty object value
+                writer.WriteRawValue("{}");
+                return;
             }
 
-            // Now we can close each open object until we get back to the original depth.
-            while (originalPropertyDepth < writer.CurrentDepth)
-            {
+            // Close the object we just opened
                 writer.WriteEndObject();
             }
         }
+
+    private static int GetApproximateDepth(JsonWriter writer)
+    {
+        // Since CurrentDepth isn't available, we'll use the Path property as a fallback
+        // This is not perfect but helps track nesting level
+        return writer.Path?.Count(c => c == '.') ?? 0;
     }
 
+
     public static void WriteBooleanIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         bool? value)
     {
@@ -682,7 +716,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteBooleanIfTrue(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         bool? value)
     {
@@ -692,8 +726,41 @@ internal static class JsonExtensions
         }
     }
 
+    public static void WriteBoolean(
+        this JsonTextWriter writer,
+        string propertyName,
+        bool value)
+    {
+        writer.WritePropertyName(propertyName);
+        writer.WriteValue(value);
+    }
+
+    public static void WriteNumber(
+        this JsonTextWriter writer,
+        string propertyName,
+        long? value)
+    {
+        if (value is not null)
+        {
+            writer.WritePropertyName(propertyName);
+            writer.WriteValue(value.Value);
+        }
+    }
+
+    public static void WriteNumber(
+        this JsonTextWriter writer,
+        string propertyName,
+        double? value)
+    {
+        if (value is not null)
+        {
+            writer.WritePropertyName(propertyName);
+            writer.WriteValue(value.Value);
+        }
+    }
+
     public static void WriteNumberIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         short? value)
     {
@@ -704,7 +771,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         int? value)
     {
@@ -715,7 +782,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         long? value)
     {
@@ -726,7 +793,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         float? value)
     {
@@ -737,7 +804,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         double? value)
     {
@@ -748,7 +815,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         short value)
     {
@@ -759,7 +826,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         int value)
     {
@@ -770,7 +837,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         long value)
     {
@@ -781,7 +848,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         float value)
     {
@@ -792,7 +859,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         double value)
     {
@@ -803,7 +870,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringIfNotWhiteSpace(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         string? value)
     {
@@ -814,7 +881,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         DateTimeOffset? value)
     {
@@ -824,8 +891,20 @@ internal static class JsonExtensions
         }
     }
 
+    public static void WriteString(
+        this JsonTextWriter writer,
+        string propertyName,
+        object? value)
+    {
+        if (value is not null)
+        {
+            writer.WritePropertyName(propertyName);
+            writer.WriteValue(value.ToString());
+        }
+    }
+
     public static void WriteSerializableIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         ISentryJsonSerializable? value,
         IDiagnosticLogger? logger)
@@ -837,7 +916,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionaryIfNotEmpty(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, object?>>? dic,
         IDiagnosticLogger? logger)
@@ -850,7 +929,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionaryIfNotEmpty<TValue>(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, TValue>>? dic,
         IDiagnosticLogger? logger)
@@ -864,7 +943,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringDictionaryIfNotEmpty(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, string?>>? dic)
     {
@@ -876,7 +955,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteArrayIfNotEmpty<T>(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<T>? arr,
         IDiagnosticLogger? logger)
@@ -889,7 +968,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringArrayIfNotEmpty(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumerable<string?>? arr)
     {
@@ -901,7 +980,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDynamicIfNotNull(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         object? value,
         IDiagnosticLogger? logger)
@@ -913,7 +992,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteString(
-        this Utf8JsonWriter writer,
+        this JsonTextWriter writer,
         string propertyName,
         IEnumeration? value)
     {
@@ -926,11 +1005,37 @@ internal static class JsonExtensions
             writer.WriteString(propertyName, value.Value);
         }
     }
+
+    public static void WriteNull(
+        this JsonTextWriter writer,
+        string propertyName)
+    {
+        writer.WritePropertyName(propertyName);
+        writer.WriteNull();
+    }
+
+    public static void ConfigureJsonSettings(Action<JsonSerializerSettings> configureSettings)
+    {throw new NotImplementedException();
+    }
 }
 
-[JsonSerializable(typeof(GrowableArray<int>))]
-[JsonSerializable(typeof(Dictionary<string, bool>))]
-[JsonSerializable(typeof(Dictionary<string, object>))]
-internal partial class SentryJsonContext : JsonSerializerContext
+internal class SentryJsonContext
 {
+    private readonly JsonSerializerSettings _settings;
+
+    public SentryJsonContext(JsonSerializerSettings? settings = null)
+    {
+        _settings = settings ?? new JsonSerializerSettings();
+
+        // Register known converters
+        RegisterConverters();
+    }
+
+    private void RegisterConverters()
+    {
+        // Register converters for GrowableArray<int>, Dictionary<string, bool>, Dictionary<string, object>
+        // if needed, they would be added to _settings.Converters
+    }
+
+    public JsonSerializerSettings GetSettings() => _settings;
 }

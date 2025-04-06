@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Infrastructure;
 using Sentry.Internal;
@@ -521,14 +522,14 @@ public abstract class HttpTransportBase
             responseString);
     }
 
-    private void LogFailure(JsonElement responseJson, HttpStatusCode responseStatusCode, SentryId? eventId)
+    private void LogFailure(JToken responseJson, HttpStatusCode responseStatusCode, SentryId? eventId)
     {
         var errorMessage =
-            responseJson.GetPropertyOrNull("detail")?.GetString()
+            responseJson["detail"]?.Value<string>()
             ?? HttpTransport.DefaultErrorMessage;
 
         var errorCauses =
-            responseJson.GetPropertyOrNull("causes")?.EnumerateArray().Select(j => j.GetString()).ToArray()
+            responseJson["causes"]?.Values<string>()?.ToArray()
             ?? Array.Empty<string>();
 
         _options.LogError("{0}: Sentry rejected the envelope '{1}'. Status code: {2}. Error detail: {3}. Error causes: {4}.",

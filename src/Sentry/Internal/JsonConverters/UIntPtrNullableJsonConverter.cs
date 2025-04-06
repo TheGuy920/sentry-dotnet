@@ -1,26 +1,39 @@
+using Newtonsoft.Json;
+
 namespace Sentry.Internal.JsonConverters;
 
-internal class UIntPtrNullableJsonConverter : JsonConverter<UIntPtr?>
+internal class UIntPtrNullableJsonConverter : JsonConverter
 {
-    public override UIntPtr? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    public override bool CanConvert(Type objectType)
     {
-        if (reader.TokenType == JsonTokenType.Null)
+        return objectType == typeof(UIntPtr?);
+    }
+
+    public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+    {
+        if (reader.TokenType == JsonToken.Null)
         {
             return null;
         }
 
-        return new UIntPtr(reader.GetUInt64());
+        if (reader.TokenType == JsonToken.Integer)
+        {
+            return new UIntPtr(Convert.ToUInt64(reader.Value));
+        }
+
+        throw new JsonSerializationException($"Unexpected token {reader.TokenType} when parsing UIntPtr?");
     }
 
-    public override void Write(Utf8JsonWriter writer, UIntPtr? value, JsonSerializerOptions options)
+    public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
     {
         if (value == null)
         {
-            writer.WriteNullValue();
+            writer.WriteNull();
         }
         else
         {
-            writer.WriteNumberValue(value.Value.ToUInt64());
+            var uintPtr = (UIntPtr)value;
+            writer.WriteValue(uintPtr.ToUInt64());
         }
     }
 }

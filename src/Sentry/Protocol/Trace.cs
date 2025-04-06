@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -107,7 +109,7 @@ public class Trace : ITraceContext, ISentryJsonSerializable, ICloneable<Trace>, 
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
@@ -127,17 +129,17 @@ public class Trace : ITraceContext, ISentryJsonSerializable, ICloneable<Trace>, 
     /// <summary>
     /// Parses trace context from JSON.
     /// </summary>
-    public static Trace FromJson(JsonElement json)
+    public static Trace FromJson(JToken json)
     {
-        var spanId = json.GetPropertyOrNull("span_id")?.Pipe(SpanId.FromJson) ?? SpanId.Empty;
-        var parentSpanId = json.GetPropertyOrNull("parent_span_id")?.Pipe(SpanId.FromJson);
-        var traceId = json.GetPropertyOrNull("trace_id")?.Pipe(SentryId.FromJson) ?? SentryId.Empty;
-        var operation = json.GetPropertyOrNull("op")?.GetString() ?? "";
-        var origin = Internal.OriginHelper.TryParse(json.GetPropertyOrNull("origin")?.GetString() ?? "");
-        var description = json.GetPropertyOrNull("description")?.GetString();
-        var status = json.GetPropertyOrNull("status")?.GetString()?.Replace("_", "").ParseEnum<SpanStatus>();
-        var isSampled = json.GetPropertyOrNull("sampled")?.GetBoolean();
-        var data = json.GetPropertyOrNull("data")?.GetDictionaryOrNull() ?? new();
+        var spanId = json["span_id"]?.Value<string>()?.Pipe(SpanId.Parse) ?? SpanId.Empty;
+        var parentSpanId = json["parent_span_id"]?.Value<string>()?.Pipe(SpanId.Parse);
+        var traceId = json["trace_id"]?.Value<string>()?.Pipe(SentryId.Parse) ?? SentryId.Empty;
+        var operation = json["op"]?.Value<string>() ?? "";
+        var origin = Internal.OriginHelper.TryParse(json["origin"]?.Value<string>() ?? "");
+        var description = json["description"]?.Value<string>();
+        var status = json["status"]?.Value<string>()?.Replace("_", "").ParseEnum<SpanStatus>();
+        var isSampled = json["sampled"]?.Value<bool?>();
+        var data = json["data"]?.ToObject<Dictionary<string, object?>>() ?? new();
 
         return new Trace
         {

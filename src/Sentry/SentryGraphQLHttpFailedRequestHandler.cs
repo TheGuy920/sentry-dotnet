@@ -1,3 +1,4 @@
+using Newtonsoft.Json.Linq;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
 using Sentry.Protocol;
@@ -21,17 +22,17 @@ internal class SentryGraphQLHttpFailedRequestHandler : SentryFailedRequestHandle
 
     protected internal override void DoEnsureSuccessfulResponse([NotNull] HttpRequestMessage request, [NotNull] HttpResponseMessage response)
     {
-        JsonElement? json = null;
+        JToken? json = null;
         try
         {
             json = GraphQLContentExtractor.ExtractResponseContentAsync(response, _options).Result;
-            if (json is { } jsonElement)
+            if (json != null)
             {
-                if (jsonElement.TryGetProperty("errors", out var errorsElement))
+                if (json["errors"] != null)
                 {
                     // We just show the first error... maybe there's a better way to do this when multiple errors exist.
                     // We should check what the Java code is doing.
-                    var errorMessage = errorsElement[0].GetProperty("message").GetString() ?? "GraphQL Error";
+                    var errorMessage = json["errors"]![0]!["message"]?.Value<string>() ?? "GraphQL Error";
                     throw new GraphQLHttpRequestException(errorMessage);
                 }
             }
@@ -90,7 +91,7 @@ internal class SentryGraphQLHttpFailedRequestHandler : SentryFailedRequestHandle
                     ((int)response.StatusCode).ToString()
                 };
             }
-            Hub.CaptureEvent(@event, hint: hint);
+            _hub.CaptureEvent(@event, hint: hint);
         }
     }
 }

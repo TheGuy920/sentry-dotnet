@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -124,21 +126,72 @@ public sealed class Mechanism : ISentryJsonSerializable
     public IDictionary<string, object> Data => InternalData ??= new Dictionary<string, object>();
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", Type);
-        writer.WriteStringIfNotWhiteSpace("description", Description);
-        writer.WriteStringIfNotWhiteSpace("source", Source);
-        writer.WriteStringIfNotWhiteSpace("help_link", HelpLink);
-        writer.WriteBooleanIfNotNull("handled", Handled);
-        writer.WriteBooleanIfTrue("synthetic", Synthetic);
-        writer.WriteBooleanIfTrue("is_exception_group", IsExceptionGroup);
-        writer.WriteNumberIfNotNull("exception_id", ExceptionId);
-        writer.WriteNumberIfNotNull("parent_id", ParentId);
-        writer.WriteDictionaryIfNotEmpty("data", InternalData!, logger);
-        writer.WriteDictionaryIfNotEmpty("meta", InternalMeta!, logger);
+        writer.WritePropertyName("type");
+        writer.WriteValue(Type);
+
+        if (!string.IsNullOrWhiteSpace(Description))
+        {
+            writer.WritePropertyName("description");
+            writer.WriteValue(Description);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Source))
+        {
+            writer.WritePropertyName("source");
+            writer.WriteValue(Source);
+        }
+
+        if (!string.IsNullOrWhiteSpace(HelpLink))
+        {
+            writer.WritePropertyName("help_link");
+            writer.WriteValue(HelpLink);
+        }
+
+        if (Handled.HasValue)
+        {
+            writer.WritePropertyName("handled");
+            writer.WriteValue(Handled.Value);
+        }
+
+        if (Synthetic)
+        {
+            writer.WritePropertyName("synthetic");
+            writer.WriteValue(Synthetic);
+        }
+
+        if (IsExceptionGroup)
+        {
+            writer.WritePropertyName("is_exception_group");
+            writer.WriteValue(IsExceptionGroup);
+        }
+
+        if (ExceptionId.HasValue)
+        {
+            writer.WritePropertyName("exception_id");
+            writer.WriteValue(ExceptionId.Value);
+        }
+
+        if (ParentId.HasValue)
+        {
+            writer.WritePropertyName("parent_id");
+            writer.WriteValue(ParentId.Value);
+        }
+
+        if (InternalData?.Count > 0)
+        {
+            writer.WritePropertyName("data");
+            writer.WriteDictionaryValue(InternalData.Select(kvp => new KeyValuePair<string,object?>(kvp.Key, kvp.Value)), logger);
+        }
+
+        if (InternalMeta?.Count > 0)
+        {
+            writer.WritePropertyName("meta");
+            writer.WriteDictionaryValue(InternalMeta.Select(kvp => new KeyValuePair<string,object?>(kvp.Key, kvp.Value)), logger);
+        }
 
         writer.WriteEndObject();
     }
@@ -146,19 +199,19 @@ public sealed class Mechanism : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Mechanism FromJson(JsonElement json)
+    public static Mechanism FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var type = json.GetPropertyOrNull("type")?.GetString();
-        var description = json.GetPropertyOrNull("description")?.GetString();
-        var source = json.GetPropertyOrNull("source")?.GetString();
-        var helpLink = json.GetPropertyOrNull("help_link")?.GetString();
-        var handled = json.GetPropertyOrNull("handled")?.GetBoolean();
-        var synthetic = json.GetPropertyOrNull("synthetic")?.GetBoolean() ?? false;
-        var isExceptionGroup = json.GetPropertyOrNull("is_exception_group")?.GetBoolean() ?? false;
-        var exceptionId = json.GetPropertyOrNull("exception_id")?.GetInt32();
-        var parentId = json.GetPropertyOrNull("parent_id")?.GetInt32();
-        var data = json.GetPropertyOrNull("data")?.GetDictionaryOrNull();
-        var meta = json.GetPropertyOrNull("meta")?.GetDictionaryOrNull();
+        var type = json["type"]?.Value<string>();
+        var description = json["description"]?.Value<string>();
+        var source = json["source"]?.Value<string>();
+        var helpLink = json["help_link"]?.Value<string>();
+        var handled = json["handled"]?.Value<bool?>();
+        var synthetic = json["synthetic"]?.Value<bool>() ?? false;
+        var isExceptionGroup = json["is_exception_group"]?.Value<bool>() ?? false;
+        var exceptionId = json["exception_id"]?.Value<int?>();
+        var parentId = json["parent_id"]?.Value<int?>();
+        var data = json["data"]?.ToObject<Dictionary<string, object?>>();
+        var meta = json["meta"]?.ToObject<Dictionary<string, object?>>();
 
         return new Mechanism
         {

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -136,22 +138,71 @@ public class SentrySpan : ISpanData, ISentryJsonSerializable
         IsSampled);
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteSerializable("span_id", SpanId, logger);
-        writer.WriteSerializableIfNotNull("parent_span_id", ParentSpanId, logger);
-        writer.WriteSerializable("trace_id", TraceId, logger);
-        writer.WriteStringIfNotWhiteSpace("op", Operation);
-        writer.WriteStringIfNotWhiteSpace("description", Description);
-        writer.WriteStringIfNotWhiteSpace("status", Status?.ToString().ToSnakeCase());
-        writer.WriteString("start_timestamp", StartTimestamp);
-        writer.WriteStringIfNotNull("timestamp", EndTimestamp);
-        writer.WriteStringDictionaryIfNotEmpty("tags", _tags!);
-        writer.WriteDictionaryIfNotEmpty("data", _data!, logger);
-        writer.WriteDictionaryIfNotEmpty("measurements", _measurements, logger);
-        writer.WriteSerializableIfNotNull("_metrics_summary", _metricsSummary, logger);
+        writer.WritePropertyName("span_id");
+        SpanId.WriteTo(writer, logger);
+
+        if (ParentSpanId.HasValue)
+        {
+            writer.WritePropertyName("parent_span_id");
+            ParentSpanId.Value.WriteTo(writer, logger);
+        }
+
+        writer.WritePropertyName("trace_id");
+        TraceId.WriteTo(writer, logger);
+
+        if (!string.IsNullOrWhiteSpace(Operation))
+        {
+            writer.WritePropertyName("op");
+            writer.WriteValue(Operation);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Description))
+        {
+            writer.WritePropertyName("description");
+            writer.WriteValue(Description);
+        }
+
+        if (Status.HasValue)
+        {
+            writer.WritePropertyName("status");
+            writer.WriteValue(Status.Value.ToString().ToSnakeCase());
+        }
+
+        writer.WritePropertyName("start_timestamp");
+        writer.WriteValue(StartTimestamp);
+
+        if (EndTimestamp.HasValue)
+        {
+            writer.WritePropertyName("timestamp");
+            writer.WriteValue(EndTimestamp.Value);
+        }
+
+        if (_tags?.Count > 0)
+        {
+            writer.WriteStringDictionary("tags", _tags.Select(kvp => new KeyValuePair<string, string?>(kvp.Key, kvp.Value)));
+        }
+
+        if (_data?.Count > 0)
+        {
+            writer.WritePropertyName("data");
+            writer.WriteDictionaryValue(_data, logger);
+        }
+
+        if (_measurements?.Count > 0)
+        {
+            writer.WritePropertyName("measurements");
+            writer.WriteDictionaryValue(_measurements, logger);
+        }
+
+        if (_metricsSummary != null)
+        {
+            writer.WritePropertyName("_metrics_summary");
+            _metricsSummary.WriteTo(writer, logger);
+        }
 
         writer.WriteEndObject();
     }
@@ -159,20 +210,20 @@ public class SentrySpan : ISpanData, ISentryJsonSerializable
     /// <summary>
     /// Parses a span from JSON.
     /// </summary>
-    public static SentrySpan FromJson(JsonElement json)
+    public static SentrySpan FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var spanId = json.GetPropertyOrNull("span_id")?.Pipe(SpanId.FromJson) ?? SpanId.Empty;
-        var parentSpanId = json.GetPropertyOrNull("parent_span_id")?.Pipe(SpanId.FromJson);
-        var traceId = json.GetPropertyOrNull("trace_id")?.Pipe(SentryId.FromJson) ?? SentryId.Empty;
-        var startTimestamp = json.GetProperty("start_timestamp").GetDateTimeOffset();
-        var endTimestamp = json.GetPropertyOrNull("timestamp")?.GetDateTimeOffset();
-        var operation = json.GetPropertyOrNull("op")?.GetString() ?? "unknown";
-        var description = json.GetPropertyOrNull("description")?.GetString();
-        var status = json.GetPropertyOrNull("status")?.GetString()?.Replace("_", "").ParseEnum<SpanStatus>();
-        var isSampled = json.GetPropertyOrNull("sampled")?.GetBoolean();
-        var tags = json.GetPropertyOrNull("tags")?.GetStringDictionaryOrNull()?.ToDict();
-        var measurements = json.GetPropertyOrNull("measurements")?.GetDictionaryOrNull(Measurement.FromJson);
-        var data = json.GetPropertyOrNull("data")?.GetDictionaryOrNull()?.ToDict();
+        var spanId = json["span_id"] != null ? SpanId.FromJson(json["span_id"]!) : SpanId.Empty;
+        var parentSpanId = json["parent_span_id"]?.ToObject<SpanId?>();
+        var traceId = json["trace_id"] != null ? SentryId.FromJson(json["trace_id"]!) : SentryId.Empty;
+        var startTimestamp = json["start_timestamp"]!.Value<DateTimeOffset>();
+        var endTimestamp = json["timestamp"]?.Value<DateTimeOffset?>();
+        var operation = json["op"]?.Value<string>() ?? "unknown";
+        var description = json["description"]?.Value<string>();
+        var status = json["status"]?.Value<string>()?.Replace("_", "").ParseEnum<SpanStatus>();
+        var isSampled = json["sampled"]?.Value<bool?>();
+        var tags = json["tags"]?.ToObject<Dictionary<string, string>?>()?.ToDict();
+        var measurements = json["measurements"]?.ToObject<Dictionary<string, Measurement>?>();
+        var data = json["data"]?.ToObject<Dictionary<string, object?>?>()?.ToDict();
 
         return new SentrySpan(parentSpanId, operation)
         {

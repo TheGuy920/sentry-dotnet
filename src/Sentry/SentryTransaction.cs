@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -379,37 +381,144 @@ public class SentryTransaction : ITransactionData, ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", "transaction");
-        writer.WriteSerializable("event_id", EventId, logger);
-        writer.WriteStringIfNotWhiteSpace("level", Level?.ToString().ToLowerInvariant());
-        writer.WriteStringIfNotWhiteSpace("platform", Platform);
-        writer.WriteStringIfNotWhiteSpace("release", Release);
-        writer.WriteStringIfNotWhiteSpace("dist", Distribution);
-        writer.WriteStringIfNotWhiteSpace("transaction", Name);
+        writer.WritePropertyName("type");
+        writer.WriteValue("transaction");
+
+        writer.WritePropertyName("event_id");
+        EventId.WriteTo(writer, logger);
+
+        if (Level.HasValue)
+        {
+            writer.WritePropertyName("level");
+            writer.WriteValue(Level.Value.ToString().ToLowerInvariant());
+        }
+
+        if (!string.IsNullOrWhiteSpace(Platform))
+        {
+            writer.WritePropertyName("platform");
+            writer.WriteValue(Platform);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Release))
+        {
+            writer.WritePropertyName("release");
+            writer.WriteValue(Release);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Distribution))
+        {
+            writer.WritePropertyName("dist");
+            writer.WriteValue(Distribution);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Name))
+        {
+            writer.WritePropertyName("transaction");
+            writer.WriteValue(Name);
+        }
 
         writer.WritePropertyName("transaction_info");
         writer.WriteStartObject();
         writer.WritePropertyName("source");
-        writer.WriteStringValue(NameSource.ToString().ToLowerInvariant());
+        writer.WriteValue(NameSource.ToString().ToLowerInvariant());
         writer.WriteEndObject();
 
-        writer.WriteString("start_timestamp", StartTimestamp);
-        writer.WriteStringIfNotNull("timestamp", EndTimestamp);
-        writer.WriteSerializableIfNotNull("request", _request, logger);
-        writer.WriteSerializableIfNotNull("contexts", _contexts.NullIfEmpty(), logger);
-        writer.WriteSerializableIfNotNull("user", _user, logger);
-        writer.WriteStringIfNotWhiteSpace("environment", Environment);
-        writer.WriteSerializable("sdk", Sdk, logger);
-        writer.WriteStringArrayIfNotEmpty("fingerprint", _fingerprint);
-        writer.WriteArrayIfNotEmpty("breadcrumbs", _breadcrumbs, logger);
-        writer.WriteStringDictionaryIfNotEmpty("tags", _tags!);
-        writer.WriteArrayIfNotEmpty("spans", _spans, logger);
-        writer.WriteDictionaryIfNotEmpty("measurements", _measurements, logger);
-        writer.WriteSerializableIfNotNull("_metrics_summary", _metricsSummary, logger);
+        writer.WritePropertyName("start_timestamp");
+        writer.WriteValue(StartTimestamp);
+
+        if (EndTimestamp.HasValue)
+        {
+            writer.WritePropertyName("timestamp");
+            writer.WriteValue(EndTimestamp.Value);
+        }
+
+        if (_request != null)
+        {
+            writer.WritePropertyName("request");
+            _request.WriteTo(writer, logger);
+        }
+
+        if (!_contexts.Values.Any())
+        {
+            writer.WritePropertyName("contexts");
+            _contexts.WriteTo(writer, logger);
+        }
+
+        if (_user != null)
+        {
+            writer.WritePropertyName("user");
+            _user.WriteTo(writer, logger);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Environment))
+        {
+            writer.WritePropertyName("environment");
+            writer.WriteValue(Environment);
+        }
+
+        writer.WritePropertyName("sdk");
+        Sdk.WriteTo(writer, logger);
+
+        if (_fingerprint?.Count > 0)
+        {
+            writer.WritePropertyName("fingerprint");
+            writer.WriteStartArray();
+            foreach (var value in _fingerprint)
+            {
+                writer.WriteValue(value);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (_breadcrumbs.Count > 0)
+        {
+            writer.WritePropertyName("breadcrumbs");
+            writer.WriteStartArray();
+            foreach (var breadcrumb in _breadcrumbs)
+            {
+                breadcrumb.WriteTo(writer, logger);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (_tags.Count > 0)
+        {
+            writer.WritePropertyName("tags");
+            writer.WriteStartObject();
+            foreach (var tag in _tags)
+            {
+                writer.WritePropertyName(tag.Key);
+                writer.WriteValue(tag.Value);
+            }
+        writer.WriteEndObject();
+        }
+
+        if (_spans.Length > 0)
+        {
+            writer.WritePropertyName("spans");
+            writer.WriteStartArray();
+            foreach (var span in _spans)
+            {
+                span.WriteTo(writer, logger);
+            }
+            writer.WriteEndArray();
+        }
+
+        if (_measurements?.Count > 0)
+        {
+            writer.WritePropertyName("measurements");
+            writer.WriteDictionaryValue(_measurements, logger);
+        }
+
+        if (_metricsSummary != null)
+        {
+            writer.WritePropertyName("_metrics_summary");
+            _metricsSummary.WriteTo(writer, logger);
+        }
 
         writer.WriteEndObject();
     }
@@ -417,35 +526,28 @@ public class SentryTransaction : ITransactionData, ISentryJsonSerializable
     /// <summary>
     /// Parses transaction from JSON.
     /// </summary>
-    public static SentryTransaction FromJson(JsonElement json)
+    public static SentryTransaction FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var eventId = json.GetPropertyOrNull("event_id")?.Pipe(SentryId.FromJson) ?? SentryId.Empty;
-        var name = json.GetProperty("transaction").GetStringOrThrow();
-        var nameSource = json.GetPropertyOrNull("transaction_info")?.GetPropertyOrNull("source")?
-            .GetString()?.ParseEnum<TransactionNameSource>() ?? TransactionNameSource.Custom;
-        var startTimestamp = json.GetProperty("start_timestamp").GetDateTimeOffset();
-        var endTimestamp = json.GetPropertyOrNull("timestamp")?.GetDateTimeOffset();
-        var level = json.GetPropertyOrNull("level")?.GetString()?.ParseEnum<SentryLevel>();
-        var platform = json.GetPropertyOrNull("platform")?.GetString();
-        var release = json.GetPropertyOrNull("release")?.GetString();
-        var distribution = json.GetPropertyOrNull("dist")?.GetString();
-        var request = json.GetPropertyOrNull("request")?.Pipe(SentryRequest.FromJson);
-        var contexts = json.GetPropertyOrNull("contexts")?.Pipe(SentryContexts.FromJson) ?? new();
-        var user = json.GetPropertyOrNull("user")?.Pipe(SentryUser.FromJson);
-        var environment = json.GetPropertyOrNull("environment")?.GetString();
-        var sdk = json.GetPropertyOrNull("sdk")?.Pipe(SdkVersion.FromJson) ?? new SdkVersion();
-        var fingerprint = json.GetPropertyOrNull("fingerprint")?
-            .EnumerateArray().Select(j => j.GetString()!).ToArray();
-        var breadcrumbs = json.GetPropertyOrNull("breadcrumbs")?
-            .EnumerateArray().Select(Breadcrumb.FromJson).ToList() ?? new();
-        var extra = json.GetPropertyOrNull("extra")?
-            .GetDictionaryOrNull() ?? new();
-        var tags = json.GetPropertyOrNull("tags")?
-            .GetStringDictionaryOrNull()?.WhereNotNullValue().ToDict() ?? new();
-        var measurements = json.GetPropertyOrNull("measurements")?
-            .GetDictionaryOrNull(Measurement.FromJson) ?? new();
-        var spans = json.GetPropertyOrNull("spans")?
-            .EnumerateArray().Select(SentrySpan.FromJson).ToArray() ?? Array.Empty<SentrySpan>();
+        var eventId = json["event_id"]?.Pipe(SentryId.FromJson) ?? SentryId.Empty;
+        var name = json["transaction"]?.Value<string>() ?? throw new InvalidOperationException("Transaction name is required");
+        var nameSource = json["transaction_info"]?["source"]?.Value<string>()?.ParseEnum<TransactionNameSource>() ?? TransactionNameSource.Custom;
+        var startTimestamp = json["start_timestamp"]?.Value<DateTimeOffset>() ?? DateTimeOffset.UtcNow;
+        var endTimestamp = json["timestamp"]?.Value<DateTimeOffset?>();
+        var level = json["level"]?.Value<string>()?.ParseEnum<SentryLevel>();
+        var platform = json["platform"]?.Value<string>();
+        var release = json["release"]?.Value<string>();
+        var distribution = json["dist"]?.Value<string>();
+        var request = json["request"]?.Pipe(SentryRequest.FromJson);
+        var contexts = json["contexts"]?.Pipe(SentryContexts.FromJson) ?? new();
+        var user = json["user"]?.Pipe(SentryUser.FromJson);
+        var environment = json["environment"]?.Value<string>();
+        var sdk = json["sdk"]?.Pipe(SdkVersion.FromJson) ?? new SdkVersion();
+        var fingerprint = json["fingerprint"]?.ToObject<string[]>();
+        var breadcrumbs = json["breadcrumbs"]?.Select(Breadcrumb.FromJson).ToList() ?? new();
+        var extra = json["extra"]?.ToObject<Dictionary<string, object?>>() ?? new();
+        var tags = json["tags"]?.ToObject<Dictionary<string, string?>>()?.WhereNotNullValue().ToDict() ?? new();
+        var measurements = json["measurements"]?.ToObject<Dictionary<string, Measurement>>() ?? new();
+        var spans = json["spans"]?.Select(SentrySpan.FromJson).ToArray() ?? Array.Empty<SentrySpan>();
 
         return new SentryTransaction(name, nameSource)
         {

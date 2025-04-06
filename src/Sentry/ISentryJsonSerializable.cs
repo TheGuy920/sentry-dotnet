@@ -1,5 +1,5 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
-using Sentry.Internal;
 
 namespace Sentry;
 
@@ -15,5 +15,5 @@ public interface ISentryJsonSerializable
     /// Note: this method is meant only for internal use and is exposed due to a language limitation.
     /// Avoid relying on this method in user code.
     /// </remarks>
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger);
+    void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger);
 }

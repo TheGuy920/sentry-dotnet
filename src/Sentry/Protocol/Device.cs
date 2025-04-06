@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -339,7 +341,7 @@ public sealed class Device : ISentryJsonSerializable, ICloneable<Device>, IUpdat
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
@@ -359,42 +361,143 @@ public sealed class Device : ISentryJsonSerializable, ICloneable<Device>, IUpdat
         writer.WriteStringIfNotWhiteSpace("model", Model);
         writer.WriteStringIfNotWhiteSpace("model_id", ModelId);
         writer.WriteStringIfNotWhiteSpace("arch", Architecture);
-        writer.WriteNumberIfNotNull("battery_level", BatteryLevel);
-        writer.WriteBooleanIfNotNull("charging", IsCharging);
-        writer.WriteBooleanIfNotNull("online", IsOnline);
-        writer.WriteStringIfNotWhiteSpace("orientation", Orientation?.ToString().ToLowerInvariant());
-        writer.WriteBooleanIfNotNull("simulator", Simulator);
-        writer.WriteNumberIfNotNull("memory_size", MemorySize);
-        writer.WriteNumberIfNotNull("free_memory", FreeMemory);
-        writer.WriteNumberIfNotNull("usable_memory", UsableMemory);
-        writer.WriteBooleanIfNotNull("low_memory", LowMemory);
-        writer.WriteNumberIfNotNull("storage_size", StorageSize);
-        writer.WriteNumberIfNotNull("free_storage", FreeStorage);
-        writer.WriteNumberIfNotNull("external_storage_size", ExternalStorageSize);
-        writer.WriteNumberIfNotNull("external_free_storage", ExternalFreeStorage);
+
+        if (BatteryLevel.HasValue)
+        {
+            writer.WriteNumber("battery_level", BatteryLevel.Value);
+        }
+
+        if (IsCharging.HasValue)
+        {
+            writer.WritePropertyName("charging");
+            writer.WriteValue(IsCharging.Value);
+        }
+
+        if (IsOnline.HasValue)
+        {
+            writer.WritePropertyName("online");
+            writer.WriteValue(IsOnline.Value);
+        }
+
+        if (Orientation.HasValue)
+        {
+            writer.WriteStringIfNotWhiteSpace("orientation", Orientation.Value.ToString().ToLowerInvariant());
+        }
+
+        if (Simulator.HasValue)
+        {
+            writer.WritePropertyName("simulator");
+            writer.WriteValue(Simulator.Value);
+        }
+
+        if (MemorySize.HasValue)
+        {
+            writer.WriteNumber("memory_size", MemorySize.Value);
+        }
+
+        if (FreeMemory.HasValue)
+        {
+            writer.WriteNumber("free_memory", FreeMemory.Value);
+        }
+
+        if (UsableMemory.HasValue)
+        {
+            writer.WriteNumber("usable_memory", UsableMemory.Value);
+        }
+
+        if (LowMemory.HasValue)
+        {
+            writer.WritePropertyName("low_memory");
+            writer.WriteValue(LowMemory.Value);
+        }
+
+        if (StorageSize.HasValue)
+        {
+            writer.WriteNumber("storage_size", StorageSize.Value);
+        }
+
+        if (FreeStorage.HasValue)
+        {
+            writer.WriteNumber("free_storage", FreeStorage.Value);
+        }
+
+        if (ExternalStorageSize.HasValue)
+        {
+            writer.WriteNumber("external_storage_size", ExternalStorageSize.Value);
+        }
+
+        if (ExternalFreeStorage.HasValue)
+        {
+            writer.WriteNumber("external_free_storage", ExternalFreeStorage.Value);
+        }
+
         writer.WriteStringIfNotWhiteSpace("screen_resolution", ScreenResolution);
-        writer.WriteNumberIfNotNull("screen_density", ScreenDensity);
-        writer.WriteNumberIfNotNull("screen_dpi", ScreenDpi);
+
+        if (ScreenDensity.HasValue)
+        {
+            writer.WriteNumber("screen_density", ScreenDensity.Value);
+        }
+
+        if (ScreenDpi.HasValue)
+        {
+            writer.WriteNumber("screen_dpi", ScreenDpi.Value);
+        }
+
         writer.WriteStringIfNotNull("boot_time", BootTime);
-        writer.WriteNumberIfNotNull("processor_count", ProcessorCount);
+
+        if (ProcessorCount.HasValue)
+        {
+            writer.WriteNumber("processor_count", ProcessorCount.Value);
+        }
+
         writer.WriteStringIfNotWhiteSpace("cpu_description", CpuDescription);
-        writer.WriteNumberIfNotNull("processor_frequency", ProcessorFrequency);
+
+        if (ProcessorFrequency.HasValue)
+        {
+            writer.WriteNumber("processor_frequency", ProcessorFrequency.Value);
+        }
+
         writer.WriteStringIfNotWhiteSpace("device_type", DeviceType);
         writer.WriteStringIfNotWhiteSpace("battery_status", BatteryStatus);
         writer.WriteStringIfNotWhiteSpace("device_unique_identifier", DeviceUniqueIdentifier);
-        writer.WriteBooleanIfNotNull("supports_vibration", SupportsVibration);
-        writer.WriteBooleanIfNotNull("supports_accelerometer", SupportsAccelerometer);
-        writer.WriteBooleanIfNotNull("supports_gyroscope", SupportsGyroscope);
-        writer.WriteBooleanIfNotNull("supports_audio", SupportsAudio);
-        writer.WriteBooleanIfNotNull("supports_location_service", SupportsLocationService);
+
+        if (SupportsVibration.HasValue)
+        {
+            writer.WritePropertyName("supports_vibration");
+            writer.WriteValue(SupportsVibration.Value);
+        }
+
+        if (SupportsAccelerometer.HasValue)
+        {
+            writer.WritePropertyName("supports_accelerometer");
+            writer.WriteValue(SupportsAccelerometer.Value);
+        }
+
+        if (SupportsGyroscope.HasValue)
+        {
+            writer.WritePropertyName("supports_gyroscope");
+            writer.WriteValue(SupportsGyroscope.Value);
+        }
+
+        if (SupportsAudio.HasValue)
+        {
+            writer.WritePropertyName("supports_audio");
+            writer.WriteValue(SupportsAudio.Value);
+        }
+
+        if (SupportsLocationService.HasValue)
+        {
+            writer.WritePropertyName("supports_location_service");
+            writer.WriteValue(SupportsLocationService.Value);
+        }
 
         writer.WriteEndObject();
     }
 
-    private static TimeZoneInfo? TryParseTimezone(JsonElement json)
+    private static TimeZoneInfo? TryParseTimezone(JObject json)
     {
-        var timezoneId = json.GetPropertyOrNull("timezone")?.GetString();
-        var timezoneName = json.GetPropertyOrNull("timezone_display_name")?.GetString() ?? timezoneId;
+        var timezoneId = json["timezone"]?.Value<string>();
+        var timezoneName = json["timezone_display_name"]?.Value<string>() ?? timezoneId;
 
         if (string.IsNullOrWhiteSpace(timezoneId))
         {
@@ -414,48 +517,44 @@ public sealed class Device : ISentryJsonSerializable, ICloneable<Device>, IUpdat
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Device FromJson(JsonElement json)
+    public static Device FromJson(JObject json)
     {
         var timezone = TryParseTimezone(json);
-        var name = json.GetPropertyOrNull("name")?.GetString();
-        var manufacturer = json.GetPropertyOrNull("manufacturer")?.GetString();
-        var brand = json.GetPropertyOrNull("brand")?.GetString();
-        var family = json.GetPropertyOrNull("family")?.GetString();
-        var model = json.GetPropertyOrNull("model")?.GetString();
-        var modelId = json.GetPropertyOrNull("model_id")?.GetString();
-        var architecture = json.GetPropertyOrNull("arch")?.GetString();
-        var batteryLevel = json.GetPropertyOrNull("battery_level")?.TryGetDouble(out var level) is true
-            ? (float)level
-            : (float?)null;
-        var isCharging = json.GetPropertyOrNull("charging")?.GetBoolean();
-        var isOnline = json.GetPropertyOrNull("online")?.GetBoolean();
-        var orientation = json.GetPropertyOrNull("orientation")?.GetString()?.ParseEnum<DeviceOrientation>();
-        var simulator = json.GetPropertyOrNull("simulator")?.GetBoolean();
-        var memorySize = json.GetPropertyOrNull("memory_size")?.GetInt64();
-        var freeMemory = json.GetPropertyOrNull("free_memory")?.GetInt64();
-        var usableMemory = json.GetPropertyOrNull("usable_memory")?.GetInt64();
-        var lowMemory = json.GetPropertyOrNull("low_memory")?.GetBoolean();
-        var storageSize = json.GetPropertyOrNull("storage_size")?.GetInt64();
-        var freeStorage = json.GetPropertyOrNull("free_storage")?.GetInt64();
-        var externalStorageSize = json.GetPropertyOrNull("external_storage_size")?.GetInt64();
-        var externalFreeStorage = json.GetPropertyOrNull("external_free_storage")?.GetInt64();
-        var screenResolution = json.GetPropertyOrNull("screen_resolution")?.GetString();
-        var screenDensity = json.GetPropertyOrNull("screen_density")?.GetSingle();
-        var screenDpi = json.GetPropertyOrNull("screen_dpi")?.GetInt32();
-        var bootTime = json.GetPropertyOrNull("boot_time")?.GetDateTimeOffset();
-        var processorCount = json.GetPropertyOrNull("processor_count")?.GetInt32();
-        var cpuDescription = json.GetPropertyOrNull("cpu_description")?.GetString();
-        var processorFrequency = json.GetPropertyOrNull("processor_frequency")?.TryGetDouble(out var frequency) is true
-            ? (float)frequency
-            : (float?)null;
-        var deviceType = json.GetPropertyOrNull("device_type")?.GetString();
-        var batteryStatus = json.GetPropertyOrNull("battery_status")?.GetString();
-        var deviceUniqueIdentifier = json.GetPropertyOrNull("device_unique_identifier")?.GetString();
-        var supportsVibration = json.GetPropertyOrNull("supports_vibration")?.GetBoolean();
-        var supportsAccelerometer = json.GetPropertyOrNull("supports_accelerometer")?.GetBoolean();
-        var supportsGyroscope = json.GetPropertyOrNull("supports_gyroscope")?.GetBoolean();
-        var supportsAudio = json.GetPropertyOrNull("supports_audio")?.GetBoolean();
-        var supportsLocationService = json.GetPropertyOrNull("supports_location_service")?.GetBoolean();
+        var name = json["name"]?.Value<string>();
+        var manufacturer = json["manufacturer"]?.Value<string>();
+        var brand = json["brand"]?.Value<string>();
+        var family = json["family"]?.Value<string>();
+        var model = json["model"]?.Value<string>();
+        var modelId = json["model_id"]?.Value<string>();
+        var architecture = json["arch"]?.Value<string>();
+        var batteryLevel = json["battery_level"]?.Value<float?>();
+        var isCharging = json["charging"]?.Value<bool?>();
+        var isOnline = json["online"]?.Value<bool?>();
+        var orientation = json["orientation"]?.Value<string>()?.ParseEnum<DeviceOrientation>();
+        var simulator = json["simulator"]?.Value<bool?>();
+        var memorySize = json["memory_size"]?.Value<long?>();
+        var freeMemory = json["free_memory"]?.Value<long?>();
+        var usableMemory = json["usable_memory"]?.Value<long?>();
+        var lowMemory = json["low_memory"]?.Value<bool?>();
+        var storageSize = json["storage_size"]?.Value<long?>();
+        var freeStorage = json["free_storage"]?.Value<long?>();
+        var externalStorageSize = json["external_storage_size"]?.Value<long?>();
+        var externalFreeStorage = json["external_free_storage"]?.Value<long?>();
+        var screenResolution = json["screen_resolution"]?.Value<string>();
+        var screenDensity = json["screen_density"]?.Value<float?>();
+        var screenDpi = json["screen_dpi"]?.Value<int?>();
+        var bootTime = json["boot_time"]?.Value<DateTimeOffset?>();
+        var processorCount = json["processor_count"]?.Value<int?>();
+        var cpuDescription = json["cpu_description"]?.Value<string>();
+        var processorFrequency = json["processor_frequency"]?.Value<float?>();
+        var deviceType = json["device_type"]?.Value<string>();
+        var batteryStatus = json["battery_status"]?.Value<string>();
+        var deviceUniqueIdentifier = json["device_unique_identifier"]?.Value<string>();
+        var supportsVibration = json["supports_vibration"]?.Value<bool?>();
+        var supportsAccelerometer = json["supports_accelerometer"]?.Value<bool?>();
+        var supportsGyroscope = json["supports_gyroscope"]?.Value<bool?>();
+        var supportsAudio = json["supports_audio"]?.Value<bool?>();
+        var supportsLocationService = json["supports_location_service"]?.Value<bool?>();
 
         return new Device
         {

@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -133,15 +135,45 @@ public sealed class SentryUser : ISentryJsonSerializable
         _other?.Count > 0;
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringIfNotWhiteSpace("id", Id);
-        writer.WriteStringIfNotWhiteSpace("username", Username);
-        writer.WriteStringIfNotWhiteSpace("email", Email);
-        writer.WriteStringIfNotWhiteSpace("ip_address", IpAddress);
-        writer.WriteStringDictionaryIfNotEmpty("other", _other!);
+        if (!string.IsNullOrWhiteSpace(Id))
+    {
+            writer.WritePropertyName("id");
+            writer.WriteValue(Id);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Username))
+        {
+            writer.WritePropertyName("username");
+            writer.WriteValue(Username);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Email))
+        {
+            writer.WritePropertyName("email");
+            writer.WriteValue(Email);
+        }
+
+        if (!string.IsNullOrWhiteSpace(IpAddress))
+        {
+            writer.WritePropertyName("ip_address");
+            writer.WriteValue(IpAddress);
+        }
+
+        if (_other != null && _other.Count > 0)
+        {
+            writer.WritePropertyName("other");
+        writer.WriteStartObject();
+            foreach (var item in _other)
+            {
+                writer.WritePropertyName(item.Key);
+                writer.WriteValue(item.Value);
+            }
+            writer.WriteEndObject();
+        }
 
         writer.WriteEndObject();
     }
@@ -149,14 +181,14 @@ public sealed class SentryUser : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryUser FromJson(JsonElement json)
+    public static SentryUser FromJson(JToken json)
     {
-        var id = json.GetPropertyOrNull("id")?.GetString();
-        var username = json.GetPropertyOrNull("username")?.GetString();
-        var email = json.GetPropertyOrNull("email")?.GetString();
-        var ip = json.GetPropertyOrNull("ip_address")?.GetString();
-        var segment = json.GetPropertyOrNull("segment")?.GetString();
-        var other = json.GetPropertyOrNull("other")?.GetStringDictionaryOrNull();
+        var id = json["id"]?.Value<string>();
+        var username = json["username"]?.Value<string>();
+        var email = json["email"]?.Value<string>();
+        var ip = json["ip_address"]?.Value<string>();
+        var segment = json["segment"]?.Value<string>();
+        var other = json["other"]?.ToObject<Dictionary<string, string?>>();
 
         return new SentryUser
         {

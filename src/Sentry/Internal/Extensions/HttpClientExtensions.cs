@@ -1,30 +1,31 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+
 namespace Sentry.Internal.Extensions;
 
 internal static class HttpClientExtensions
 {
-    public static async Task<JsonElement> ReadAsJsonAsync(
+    public static async Task<JToken> ReadAsJsonAsync(
         this HttpContent content,
         CancellationToken cancellationToken = default)
     {
         var stream = await content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
-#if NETFRAMEWORK || NETSTANDARD2_0
-        using (stream)
-#else
         await using (stream.ConfigureAwait(false))
-#endif
         {
-            using var document = await JsonDocument.ParseAsync(stream, default, cancellationToken)
-                .ConfigureAwait(false);
-
-            return document.RootElement.Clone();
+            using var reader = new StreamReader(stream);
+            using var jsonReader = new JsonTextReader(reader);
+            var serializer = JsonSerializer.CreateDefault();
+            return await JToken.LoadAsync(jsonReader, cancellationToken).ConfigureAwait(false);
         }
     }
 
-    public static JsonElement ReadAsJson(this HttpContent content)
+    public static JToken ReadAsJson(this HttpContent content)
     {
         using var stream = content.ReadAsStream();
-        using var document = JsonDocument.Parse(stream);
-        return document.RootElement.Clone();
+        using var reader = new StreamReader(stream);
+        using var jsonReader = new JsonTextReader(reader);
+        var serializer = JsonSerializer.CreateDefault();
+        return JToken.Load(jsonReader);
     }
 
     public static string ReadAsString(this HttpContent content)

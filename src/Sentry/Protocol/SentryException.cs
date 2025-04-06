@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -44,19 +46,35 @@ public sealed class SentryException : ISentryJsonSerializable
     public Mechanism? Mechanism { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringIfNotWhiteSpace("type", Type);
-        writer.WriteStringIfNotWhiteSpace("value", Value);
-        writer.WriteStringIfNotWhiteSpace("module", Module);
-        writer.WriteNumberIfNotNull("thread_id", ThreadId.NullIfDefault());
-        writer.WriteSerializableIfNotNull("stacktrace", Stacktrace, logger);
+        writer.WritePropertyName("type");
+        writer.WriteValue(Type);
+
+        writer.WritePropertyName("value");
+        writer.WriteValue(Value);
+
+        writer.WritePropertyName("module");
+        writer.WriteValue(Module);
+
+        if (ThreadId != 0)
+        {
+            writer.WritePropertyName("thread_id");
+            writer.WriteValue(ThreadId);
+        }
+
+        if (Stacktrace != null)
+        {
+            writer.WritePropertyName("stacktrace");
+            Stacktrace.WriteTo(writer, logger);
+        }
 
         if (Mechanism?.IsDefaultOrEmpty() == false)
         {
-            writer.WriteSerializableIfNotNull("mechanism", Mechanism, logger);
+            writer.WritePropertyName("mechanism");
+            Mechanism.WriteTo(writer, logger);
         }
 
         writer.WriteEndObject();
@@ -65,14 +83,14 @@ public sealed class SentryException : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryException FromJson(JsonElement json)
+    public static SentryException FromJson(Newtonsoft.Json.Linq.JToken json)
     {
-        var type = json.GetPropertyOrNull("type")?.GetString();
-        var value = json.GetPropertyOrNull("value")?.GetString();
-        var module = json.GetPropertyOrNull("module")?.GetString();
-        var threadId = json.GetPropertyOrNull("thread_id")?.GetInt32() ?? 0;
-        var stacktrace = json.GetPropertyOrNull("stacktrace")?.Pipe(SentryStackTrace.FromJson);
-        var mechanism = json.GetPropertyOrNull("mechanism")?.Pipe(Mechanism.FromJson);
+        var type = json["type"]?.Value<string>();
+        var value = json["value"]?.Value<string>();
+        var module = json["module"]?.Value<string>();
+        var threadId = json["thread_id"]?.Value<int>() ?? 0;
+        var stacktrace = json["stacktrace"] != null ? SentryStackTrace.FromJson(json["stacktrace"]!) : null;
+        var mechanism = json["mechanism"] != null ? Mechanism.FromJson(json["mechanism"]!) : null;
 
         if (mechanism?.IsDefaultOrEmpty() == true)
         {

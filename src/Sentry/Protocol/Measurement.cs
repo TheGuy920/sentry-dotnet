@@ -1,5 +1,6 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
-using Sentry.Internal.Extensions;
 
 namespace Sentry.Protocol;
 
@@ -49,27 +50,32 @@ public sealed class Measurement : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
+        writer.WritePropertyName("value");
         switch (Value)
         {
             case int number:
-                writer.WriteNumber("value", number);
+                writer.WriteValue(number);
                 break;
             case long number:
-                writer.WriteNumber("value", number);
+                writer.WriteValue(number);
                 break;
             case ulong number:
-                writer.WriteNumber("value", number);
+                writer.WriteValue(number);
                 break;
             case double number:
-                writer.WriteNumber("value", number);
+                writer.WriteValue(number);
                 break;
         }
 
-        writer.WriteStringIfNotWhiteSpace("unit", Unit.ToString());
+        if (!string.IsNullOrWhiteSpace(Unit.ToString()))
+        {
+            writer.WritePropertyName("unit");
+            writer.WriteValue(Unit.ToString());
+        }
 
         writer.WriteEndObject();
     }
@@ -77,10 +83,10 @@ public sealed class Measurement : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Measurement FromJson(JsonElement json)
+    public static Measurement FromJson(JToken json)
     {
-        var value = json.GetProperty("value").GetDynamicOrNull()!;
-        var unit = json.GetPropertyOrNull("unit")?.GetString();
+        var value = json["value"]?.ToObject<object>()!;
+        var unit = json["unit"]?.Value<string>();
         return new Measurement(value, MeasurementUnit.Parse(unit));
     }
 }

@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -85,25 +86,44 @@ public class SentryCheckIn : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteSerializable("check_in_id", Id, logger);
-        writer.WriteString("monitor_slug", MonitorSlug);
-        writer.WriteString("status", ToSnakeCase(Status));
+        writer.WritePropertyName("check_in_id");
+        writer.WriteValue(Id);
+        writer.WritePropertyName("monitor_slug");
+        writer.WriteValue(MonitorSlug);
+        writer.WritePropertyName("status");
+        writer.WriteValue(ToSnakeCase(Status));
 
-        writer.WriteNumberIfNotNull("duration", Duration?.TotalSeconds);
-        writer.WriteStringIfNotWhiteSpace("release", Release);
-        writer.WriteStringIfNotWhiteSpace("environment", Environment);
+        if (Duration.HasValue)
+        {
+            writer.WritePropertyName("duration");
+            writer.WriteValue(Duration.Value.TotalSeconds);
+        }
 
-        // Check-Ins have their own context but that only support Trace ID
+        if (!string.IsNullOrWhiteSpace(Release))
+        {
+            writer.WritePropertyName("release");
+            writer.WriteValue(Release);
+        }
+
+        if (!string.IsNullOrWhiteSpace(Environment))
+        {
+            writer.WritePropertyName("environment");
+            writer.WriteValue(Environment);
+        }
+
         if (TraceId is not null)
         {
-            writer.WriteStartObject("contexts");
-            writer.WriteStartObject("trace");
+            writer.WritePropertyName("contexts");
+            writer.WriteStartObject();
+            writer.WritePropertyName("trace");
+            writer.WriteStartObject();
 
-            writer.WriteStringIfNotWhiteSpace("trace_id", TraceId.ToString());
+            writer.WritePropertyName("trace_id");
+            writer.WriteValue(TraceId.ToString());
 
             writer.WriteEndObject();
             writer.WriteEndObject();

@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 
 namespace Sentry.Protocol.Metrics;
@@ -27,7 +28,7 @@ internal class MetricsSummary : ISentryJsonSerializable
         _measurements = measurements.ToImmutableSortedDictionary();
     }
 
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

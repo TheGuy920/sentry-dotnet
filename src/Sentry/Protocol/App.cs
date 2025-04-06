@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
@@ -104,11 +106,11 @@ public sealed class App : ISentryJsonSerializable, ICloneable<App>, IUpdatable<A
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", Type);
+        writer.WriteStringIfNotWhiteSpace("type", Type);
         writer.WriteStringIfNotWhiteSpace("app_identifier", Identifier);
         writer.WriteStringIfNotNull("app_start_time", StartTime);
         writer.WriteStringIfNotWhiteSpace("device_app_hash", Hash);
@@ -124,27 +126,18 @@ public sealed class App : ISentryJsonSerializable, ICloneable<App>, IUpdatable<A
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static App FromJson(JsonElement json)
+    public static App FromJson(JObject json)
     {
-        var identifier = json.GetPropertyOrNull("app_identifier")?.GetString();
-        var startTime = json.GetPropertyOrNull("app_start_time")?.GetDateTimeOffset();
-        var hash = json.GetPropertyOrNull("device_app_hash")?.GetString();
-        var buildType = json.GetPropertyOrNull("build_type")?.GetString();
-        var name = json.GetPropertyOrNull("app_name")?.GetString();
-        var version = json.GetPropertyOrNull("app_version")?.GetString();
-        var build = json.GetPropertyOrNull("app_build")?.GetString();
-        var inForeground = json.GetPropertyOrNull("in_foreground")?.GetBoolean();
-
         return new App
         {
-            Identifier = identifier,
-            StartTime = startTime,
-            Hash = hash,
-            BuildType = buildType,
-            Name = name,
-            Version = version,
-            Build = build,
-            InForeground = inForeground
+            Identifier = json["app_identifier"]?.Value<string>(),
+            StartTime = json["app_start_time"]?.Value<DateTimeOffset?>(),
+            Hash = json["device_app_hash"]?.Value<string>(),
+            BuildType = json["build_type"]?.Value<string>(),
+            Name = json["app_name"]?.Value<string>(),
+            Version = json["app_version"]?.Value<string>(),
+            Build = json["app_build"]?.Value<string>(),
+            InForeground = json["in_foreground"]?.Value<bool?>()
         };
     }
 }

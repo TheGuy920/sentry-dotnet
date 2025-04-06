@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -37,12 +39,14 @@ public sealed class SentryPackage : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteStringIfNotWhiteSpace("name", Name);
-        writer.WriteStringIfNotWhiteSpace("version", Version);
+        writer.WritePropertyName("name");
+        writer.WriteValue(Name);
+        writer.WritePropertyName("version");
+        writer.WriteValue(Version);
 
         writer.WriteEndObject();
     }
@@ -50,10 +54,10 @@ public sealed class SentryPackage : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static SentryPackage FromJson(JsonElement json)
+    public static SentryPackage FromJson(JToken json)
     {
-        var name = json.GetProperty("name").GetStringOrThrow();
-        var version = json.GetProperty("version").GetStringOrThrow();
+        var name = json["name"]?.ToString() ?? throw new JsonException("name is required");
+        var version = json["version"]?.ToString() ?? throw new JsonException("version is required");
 
         return new SentryPackage(name, version);
     }

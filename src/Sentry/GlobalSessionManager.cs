@@ -1,7 +1,7 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Infrastructure;
 using Sentry.Internal;
-using Sentry.Internal.Extensions;
 
 namespace Sentry;
 
@@ -78,9 +78,10 @@ internal class GlobalSessionManager : ISessionManager
 
             try
             {
-                using var writer = new Utf8JsonWriter(file);
-                persistedSessionUpdate.WriteTo(writer, _options.DiagnosticLogger);
-                writer.Flush();
+                using var textWriter = new StreamWriter(file);
+                using var jsonWriter = new JsonTextWriter(textWriter);
+                persistedSessionUpdate.WriteTo(jsonWriter, _options.DiagnosticLogger);
+                jsonWriter.Flush();
             }
             finally
             {

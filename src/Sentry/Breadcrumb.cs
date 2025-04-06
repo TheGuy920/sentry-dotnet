@@ -1,6 +1,8 @@
 using Sentry.Extensibility;
 using Sentry.Internal;
 using Sentry.Internal.Extensions;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 namespace Sentry;
 
@@ -130,19 +132,32 @@ public sealed class Breadcrumb : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString(
-            "timestamp",
-            Timestamp.ToString("yyyy-MM-ddTHH\\:mm\\:ss.fffZ", DateTimeFormatInfo.InvariantInfo));
+        writer.WritePropertyName("timestamp");
+        writer.WriteValue(Timestamp.ToString("yyyy-MM-ddTHH\\:mm\\:ss.fffZ", DateTimeFormatInfo.InvariantInfo));
 
-        writer.WriteStringIfNotWhiteSpace("message", Message);
-        writer.WriteStringIfNotWhiteSpace("type", Type);
-        writer.WriteStringDictionaryIfNotEmpty("data", Data!);
-        writer.WriteStringIfNotWhiteSpace("category", Category);
-        writer.WriteStringIfNotWhiteSpace("level", Level.NullIfDefault()?.ToString().ToLowerInvariant());
+        writer.WritePropertyName("message");
+        writer.WriteValue(Message);
+        writer.WritePropertyName("type");
+        writer.WriteValue(Type);
+        writer.WritePropertyName("data");
+        writer.WriteStartObject();
+        if (Data != null)
+        {
+            foreach (var kvp in Data)
+            {
+                writer.WritePropertyName(kvp.Key);
+                writer.WriteValue(kvp.Value);
+            }
+        }
+        writer.WriteEndObject();
+        writer.WritePropertyName("category");
+        writer.WriteValue(Category);
+        writer.WritePropertyName("level");
+        writer.WriteValue(Level.NullIfDefault()?.ToString().ToLowerInvariant());
 
         writer.WriteEndObject();
     }
@@ -150,15 +165,16 @@ public sealed class Breadcrumb : ISentryJsonSerializable
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static Breadcrumb FromJson(JsonElement json)
+    public static Breadcrumb FromJson(JToken json)
     {
-        var timestamp = json.GetPropertyOrNull("timestamp")?.GetDateTimeOffset();
-        var message = json.GetPropertyOrNull("message")?.GetString();
-        var type = json.GetPropertyOrNull("type")?.GetString();
-        var data = json.GetPropertyOrNull("data")?.GetStringDictionaryOrNull();
-        var category = json.GetPropertyOrNull("category")?.GetString();
+        var timestamp = json["timestamp"]?.ToObject<DateTimeOffset>();
+        var message = json["message"]?.ToString();
+        var type = json["type"]?.ToString();
+        var dataToken = json["data"];
+        var data = dataToken != null ? dataToken.ToObject<Dictionary<string, string>>() : null;
+        var category = json["category"]?.ToString();
 
-        var levelString = json.GetPropertyOrNull("level")?.GetString();
+        var levelString = json["level"]?.ToString();
         var level = levelString?.ToUpper() switch
         {
             "DEBUG" => BreadcrumbLevel.Debug,
@@ -169,6 +185,6 @@ public sealed class Breadcrumb : ISentryJsonSerializable
             "FATAL" => BreadcrumbLevel.Critical,
             _ => default
         };
-        return new Breadcrumb(timestamp, message, type, data!, category, level);
+        return new Breadcrumb(timestamp, message, type, data, category, level);
     }
 }

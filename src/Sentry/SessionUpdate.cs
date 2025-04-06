@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -136,26 +138,67 @@ public class SessionUpdate : ISentrySession, ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteSerializable("sid", Id, logger);
-        writer.WriteStringIfNotWhiteSpace("did", DistinctId);
-        writer.WriteBoolean("init", IsInitial);
-        writer.WriteString("started", StartTimestamp);
-        writer.WriteString("timestamp", Timestamp);
-        writer.WriteNumber("seq", SequenceNumber);
-        writer.WriteNumber("duration", (int)Duration.TotalSeconds);
-        writer.WriteNumber("errors", ErrorCount);
-        writer.WriteStringIfNotWhiteSpace("status", EndStatus?.ToString().ToSnakeCase());
+        writer.WritePropertyName("sid");
+        writer.WriteValue(Id.ToString());
 
-        // Attributes
-        writer.WriteStartObject("attrs");
-        writer.WriteString("release", Release);
-        writer.WriteStringIfNotWhiteSpace("environment", Environment);
-        writer.WriteStringIfNotWhiteSpace("ip_address", IpAddress);
-        writer.WriteStringIfNotWhiteSpace("user_agent", UserAgent);
+        if (!string.IsNullOrWhiteSpace(DistinctId))
+        {
+            writer.WritePropertyName("did");
+            writer.WriteValue(DistinctId);
+        }
+
+        writer.WritePropertyName("init");
+        writer.WriteValue(IsInitial);
+
+        writer.WritePropertyName("started");
+        writer.WriteValue(StartTimestamp);
+
+        writer.WritePropertyName("timestamp");
+        writer.WriteValue(Timestamp);
+
+        writer.WritePropertyName("seq");
+        writer.WriteValue(SequenceNumber);
+
+        writer.WritePropertyName("duration");
+        writer.WriteValue((int)Duration.TotalSeconds);
+
+        writer.WritePropertyName("errors");
+        writer.WriteValue(ErrorCount);
+
+        if (EndStatus.HasValue)
+        {
+            writer.WritePropertyName("status");
+            writer.WriteValue(EndStatus.Value.ToString().ToSnakeCase());
+        }
+
+        writer.WritePropertyName("attrs");
+        writer.WriteStartObject();
+
+        writer.WritePropertyName("release");
+        writer.WriteValue(Release);
+
+        if (!string.IsNullOrWhiteSpace(Environment))
+        {
+            writer.WritePropertyName("environment");
+            writer.WriteValue(Environment);
+        }
+
+        if (!string.IsNullOrWhiteSpace(IpAddress))
+        {
+            writer.WritePropertyName("ip_address");
+            writer.WriteValue(IpAddress);
+        }
+
+        if (!string.IsNullOrWhiteSpace(UserAgent))
+        {
+            writer.WritePropertyName("user_agent");
+            writer.WriteValue(UserAgent);
+        }
+
         writer.WriteEndObject();
 
         writer.WriteEndObject();
@@ -164,20 +207,20 @@ public class SessionUpdate : ISentrySession, ISentryJsonSerializable
     /// <summary>
     /// Parses <see cref="SessionUpdate"/> from JSON.
     /// </summary>
-    public static SessionUpdate FromJson(JsonElement json)
+    public static SessionUpdate FromJson(JToken json)
     {
-        var id = json.GetProperty("sid").GetStringOrThrow().Pipe(SentryId.Parse);
-        var distinctId = json.GetPropertyOrNull("did")?.GetString();
-        var startTimestamp = json.GetProperty("started").GetDateTimeOffset();
-        var release = json.GetProperty("attrs").GetProperty("release").GetStringOrThrow();
-        var environment = json.GetProperty("attrs").GetPropertyOrNull("environment")?.GetString();
-        var ipAddress = json.GetProperty("attrs").GetPropertyOrNull("ip_address")?.GetString();
-        var userAgent = json.GetProperty("attrs").GetPropertyOrNull("user_agent")?.GetString();
-        var errorCount = json.GetPropertyOrNull("errors")?.GetInt32() ?? 0;
-        var isInitial = json.GetPropertyOrNull("init")?.GetBoolean() ?? false;
-        var timestamp = json.GetProperty("timestamp").GetDateTimeOffset();
-        var sequenceNumber = json.GetProperty("seq").GetInt32();
-        var endStatus = json.GetPropertyOrNull("status")?.GetString()?.ParseEnum<SessionEndStatus>();
+        var id = SentryId.Parse(json["sid"]!.Value<string>()!);
+        var distinctId = json["did"]?.Value<string>();
+        var startTimestamp = json["started"]!.Value<DateTimeOffset>();
+        var release = json["attrs"]!["release"]!.Value<string>()!;
+        var environment = json["attrs"]!["environment"]?.Value<string>();
+        var ipAddress = json["attrs"]!["ip_address"]?.Value<string>();
+        var userAgent = json["attrs"]!["user_agent"]?.Value<string>();
+        var errorCount = json["errors"]?.Value<int>() ?? 0;
+        var isInitial = json["init"]?.Value<bool>() ?? false;
+        var timestamp = json["timestamp"]!.Value<DateTimeOffset>();
+        var sequenceNumber = json["seq"]!.Value<int>();
+        var endStatus = json["status"]?.Value<string>()?.ParseEnum<SessionEndStatus>();
 
         return new SessionUpdate(
             id,

@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 
 namespace Sentry;
@@ -33,17 +34,19 @@ public abstract class ViewHierarchyNode : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteString("type", Type);
+        writer.WritePropertyName("type");
+        writer.WriteValue(Type);
 
         WriteAdditionalProperties(writer, logger);
 
-        if (Children is { } children)
+        if (_children is { } children)
         {
-            writer.WriteStartArray("children");
+            writer.WritePropertyName("children");
+            writer.WriteStartArray();
             foreach (var child in children)
             {
                 child.WriteTo(writer, logger);
@@ -57,5 +60,5 @@ public abstract class ViewHierarchyNode : ISentryJsonSerializable
     /// <summary>
     /// Gets automatically called and writes additional properties during <see cref="WriteTo"/>
     /// </summary>
-    protected abstract void WriteAdditionalProperties(Utf8JsonWriter writer, IDiagnosticLogger? logger);
+    protected abstract void WriteAdditionalProperties(JsonTextWriter writer, IDiagnosticLogger? logger);
 }

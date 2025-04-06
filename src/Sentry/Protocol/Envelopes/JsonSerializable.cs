@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 
 namespace Sentry.Protocol.Envelopes;
@@ -20,9 +21,9 @@ internal sealed class JsonSerializable : ISerializable
     /// <inheritdoc />
     public async Task SerializeAsync(Stream stream, IDiagnosticLogger? logger, CancellationToken cancellationToken = default)
     {
-        var writer = new Utf8JsonWriter(stream);
+        var writer = new JsonTextWriter(new StreamWriter(stream));
 
-        await using (writer.ConfigureAwait(false))
+        // await using (writer.ConfigureAwait(false))
         {
             Source.WriteTo(writer, logger);
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
@@ -32,7 +33,7 @@ internal sealed class JsonSerializable : ISerializable
     /// <inheritdoc />
     public void Serialize(Stream stream, IDiagnosticLogger? logger)
     {
-        using var writer = new Utf8JsonWriter(stream);
+        using var writer = new JsonTextWriter(new StreamWriter(stream));
         Source.WriteTo(writer, logger);
         writer.Flush();
     }

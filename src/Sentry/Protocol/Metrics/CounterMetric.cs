@@ -1,4 +1,6 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
+using Sentry.Internal.Extensions;
 
 namespace Sentry.Protocol.Metrics;
 
@@ -23,7 +25,7 @@ internal class CounterMetric : Metric
 
     public override void Add(double value) => Value += value;
 
-    protected override void WriteValues(Utf8JsonWriter writer, IDiagnosticLogger? logger) =>
+    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger) =>
         writer.WriteNumber("value", Value);
 
     protected override IEnumerable<IConvertible> SerializedStatsdValues()

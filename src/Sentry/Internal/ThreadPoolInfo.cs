@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 
 namespace Sentry.Internal;
@@ -27,16 +28,22 @@ internal sealed class ThreadPoolInfo : ISentryJsonSerializable
     public int AvailableWorkerThreads { get; }
     public int AvailableCompletionPortThreads { get; }
 
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
-        writer.WriteNumber("min_worker_threads", MinWorkerThreads);
-        writer.WriteNumber("min_completion_port_threads", MinCompletionPortThreads);
-        writer.WriteNumber("max_worker_threads", MaxWorkerThreads);
-        writer.WriteNumber("max_completion_port_threads", MaxCompletionPortThreads);
-        writer.WriteNumber("available_worker_threads", AvailableWorkerThreads);
-        writer.WriteNumber("available_completion_port_threads", AvailableCompletionPortThreads);
+        writer.WritePropertyName("min_worker_threads");
+        writer.WriteValue(MinWorkerThreads);
+        writer.WritePropertyName("min_completion_port_threads");
+        writer.WriteValue(MinCompletionPortThreads);
+        writer.WritePropertyName("max_worker_threads");
+        writer.WriteValue(MaxWorkerThreads);
+        writer.WritePropertyName("max_completion_port_threads");
+        writer.WriteValue(MaxCompletionPortThreads);
+        writer.WritePropertyName("available_worker_threads");
+        writer.WriteValue(AvailableWorkerThreads);
+        writer.WritePropertyName("available_completion_port_threads");
+        writer.WriteValue(AvailableCompletionPortThreads);
 
         writer.WriteEndObject();
     }

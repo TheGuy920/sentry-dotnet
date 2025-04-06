@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 using ISentrySerializable = Sentry.Protocol.Envelopes.ISerializable;
@@ -73,10 +74,10 @@ internal abstract class Metric : ISentryJsonSerializable, ISentrySerializable
     /// <summary>
     /// Serializes metric values to JSON
     /// </summary>
-    protected abstract void WriteValues(Utf8JsonWriter writer, IDiagnosticLogger? logger);
+    protected abstract void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger);
 
     /// <inheritdoc cref="ISentryJsonSerializable.WriteTo"/>
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WriteString("type", GetType().Name);
@@ -151,7 +152,8 @@ internal abstract class Metric : ISentryJsonSerializable, ISentrySerializable
 
         async Task Write(string content)
         {
-            await stream.WriteAsync(Encoding.UTF8.GetBytes(content), cancellationToken).ConfigureAwait(false);
+            var data = Encoding.UTF8.GetBytes(content);
+            await stream.WriteAsync(data,0 , data.Length, cancellationToken).ConfigureAwait(false);
         }
     }
 

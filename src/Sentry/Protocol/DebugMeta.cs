@@ -1,3 +1,5 @@
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Sentry.Extensibility;
 using Sentry.Internal.Extensions;
 
@@ -12,19 +14,30 @@ internal sealed class DebugMeta : ISentryJsonSerializable
     public List<DebugImage>? Images { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(Utf8JsonWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
-        writer.WriteArrayIfNotEmpty("images", Images, logger);
+
+        if (Images?.Count > 0)
+        {
+            writer.WritePropertyName("images");
+            writer.WriteStartArray();
+            foreach (var image in Images)
+            {
+                image.WriteTo(writer, logger);
+            }
+            writer.WriteEndArray();
+        }
+
         writer.WriteEndObject();
     }
 
     /// <summary>
     /// Parses from JSON.
     /// </summary>
-    public static DebugMeta FromJson(JsonElement json)
+    public static DebugMeta FromJson(JToken json)
     {
-        var images = json.GetPropertyOrNull("images")?.EnumerateArray().Select(DebugImage.FromJson).ToList();
+        var images = json["images"]?.ToObject<JArray>()?.Select(token => DebugImage.FromJson((JObject)token)).ToList();
 
         return new DebugMeta
         {
