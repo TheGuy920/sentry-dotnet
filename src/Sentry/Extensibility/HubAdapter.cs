@@ -15,6 +15,11 @@ namespace Sentry.Extensibility;
 [DebuggerStepThrough]
 public sealed class HubAdapter : IHub
 {
+    /// <summary>
+    /// The single instance which forwards all calls to <see cref="SentrySdk"/>
+    /// </summary>
+    public static readonly HubAdapter Instance = new();
+
     private HubAdapter() { }
 
     /// <summary>

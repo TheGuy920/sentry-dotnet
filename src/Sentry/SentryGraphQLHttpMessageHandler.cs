@@ -20,7 +20,7 @@ public class SentryGraphQLHttpMessageHandler : SentryMessageHandler
     /// </summary>
     /// <param name="innerHandler">An inner message handler to delegate calls to.</param>
     /// <param name="hub">The Sentry hub.</param>
-    public SentryGraphQLHttpMessageHandler(IHub? hub, HttpMessageHandler? innerHandler = default)
+    public SentryGraphQLHttpMessageHandler(HttpMessageHandler? innerHandler = default, IHub? hub = default)
         : this(hub, default, innerHandler)
     {
     }
@@ -30,7 +30,7 @@ public class SentryGraphQLHttpMessageHandler : SentryMessageHandler
         ISentryFailedRequestHandler? failedRequestHandler = null)
     : base(hub, options, innerHandler)
     {
-        _hub = hub ?? null!; // TODO: Handle nullability
+        _hub = hub ?? HubAdapter.Instance;
         _options = options ?? _hub.GetSentryOptions();
         _failedRequestHandler = failedRequestHandler;
         if (_options != null)

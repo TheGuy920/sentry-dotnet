@@ -1095,7 +1095,7 @@ public class SentryOptions
 
     /// <summary>
     /// <para>
-    /// Set to `true` to prevents Sentry from automatically registering SentryHttpMessageHandler.
+    /// Set to `true` to prevents Sentry from automatically registering <see cref="SentryHttpMessageHandler"/>.
     /// </para>
     /// <para>Defaults to `false`. Should be set to `true` when using the OpenTelemetry.Instrumentation.Http.</para>
     /// </summary>

@@ -347,7 +347,7 @@ internal class BackgroundWorker : IBackgroundWorker, IDisposable
             // the _continuation_ of the method, not its _execution_.  If we stop waiting prematurely, we may
             // leave the task in the "WaitingForActivation" state, which has resulted in some flaky tests and
             // may cause unexpected behavior in client applications.
-            WorkerTask.Wait(10_000);
+            WorkerTask.Wait();
         }
         catch (OperationCanceledException)
         {
