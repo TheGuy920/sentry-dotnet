@@ -28,7 +28,7 @@ internal class MetricsSummary : ISentryJsonSerializable
         _measurements = measurements.ToImmutableSortedDictionary();
     }
 
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

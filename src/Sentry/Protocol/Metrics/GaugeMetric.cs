@@ -47,7 +47,7 @@ internal class GaugeMetric : Metric
         Count++;
     }
 
-    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger)
+    protected override void WriteValues(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteNumber("value", Value);
         writer.WriteNumber("first", First);

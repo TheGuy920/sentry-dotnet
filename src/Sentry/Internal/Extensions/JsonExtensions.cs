@@ -284,7 +284,7 @@ internal static class JsonExtensions
         json.Value<string>() ?? throw new InvalidOperationException("JSON string is null.");
 
     public static void WriteDictionaryValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         IEnumerable<KeyValuePair<string, object?>>? dic,
         IDiagnosticLogger? logger,
         bool includeNullValues = true)
@@ -320,7 +320,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionaryValue<TValue>(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         IEnumerable<KeyValuePair<string, TValue>>? dic,
         IDiagnosticLogger? logger,
         bool includeNullValues = true)
@@ -351,7 +351,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringDictionaryValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         IEnumerable<KeyValuePair<string, string?>>? dic)
     {
         if (dic is not null)
@@ -372,7 +372,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionary(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, object?>>? dic,
         IDiagnosticLogger? logger)
@@ -382,7 +382,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionary<TValue>(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, TValue>>? dic,
         IDiagnosticLogger? logger)
@@ -393,7 +393,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringDictionary(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, string?>>? dic)
     {
@@ -402,7 +402,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteArrayValue<T>(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         IEnumerable<T>? arr,
         IDiagnosticLogger? logger)
     {
@@ -424,7 +424,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteArray<T>(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<T>? arr,
         IDiagnosticLogger? logger)
@@ -434,7 +434,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringArrayValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         IEnumerable<string?>? arr)
     {
         if (arr is not null)
@@ -455,7 +455,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringArray(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<string?>? arr)
     {
@@ -464,7 +464,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteSerializableValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         ISentryJsonSerializable value,
         IDiagnosticLogger? logger)
     {
@@ -472,7 +472,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteSerializable(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         ISentryJsonSerializable value,
         IDiagnosticLogger? logger)
@@ -482,7 +482,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDynamicValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         object? value,
         IDiagnosticLogger? logger)
     {
@@ -565,21 +565,21 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         long value)
     {
         writer.WriteValue(value);
     }
 
     public static void WriteNumberValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         double value)
     {
         writer.WriteValue(value);
     }
 
     public static void WriteStringValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string? value)
     {
         if (value is null)
@@ -593,28 +593,28 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         DateTime value)
     {
         writer.WriteValue(value);
     }
 
     public static void WriteStringValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         DateTimeOffset value)
     {
         writer.WriteValue(value);
     }
 
     public static void WriteBooleanValue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         bool value)
     {
         writer.WriteValue(value);
     }
 
     public static void WriteNullValue(
-        this JsonTextWriter writer)
+        this SentryJsonWriter writer)
     {
         writer.WriteNull();
     }
@@ -622,7 +622,7 @@ internal static class JsonExtensions
     internal static string ToUtf8Json(this object value, bool preserveReferences = false)
     {
         using var stream = new MemoryStream();
-        using var writer = new JsonTextWriter(new StreamWriter(stream));
+        using var writer = new SentryJsonWriter(stream);
         InternalSerialize(writer, value, preserveReferences);
         writer.Flush();
         return Encoding.UTF8.GetString(stream.ToArray());
@@ -636,25 +636,23 @@ internal static class JsonExtensions
     private static byte[] InternalSerializeToUtf8Bytes(object value)
     {
         using var ms = new MemoryStream();
-        using var writer = new StreamWriter(ms, Encoding.UTF8);
-        using var jsonWriter = new JsonTextWriter(writer);
+        using var jsonWriter = new SentryJsonWriter(ms);
 
         var serializer = JsonSerializer.Create(SerializerSettings);
         serializer.Serialize(jsonWriter, value);
 
         jsonWriter.Flush();
-        writer.Flush();
 
         return ms.ToArray();
     }
 
-    private static void InternalSerialize(JsonTextWriter writer, object value, bool preserveReferences = false)
+    private static void InternalSerialize(SentryJsonWriter writer, object value, bool preserveReferences = false)
     {
         var serializer = JsonSerializer.Create(GetSerializerSettings(preserveReferences));
         serializer.Serialize(writer, value);
     }
     public static void WriteDynamic(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         object? value,
         IDiagnosticLogger? logger)
@@ -705,7 +703,7 @@ internal static class JsonExtensions
 
 
     public static void WriteBooleanIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         bool? value)
     {
@@ -716,7 +714,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteBooleanIfTrue(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         bool? value)
     {
@@ -727,7 +725,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteBoolean(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         bool value)
     {
@@ -736,7 +734,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumber(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         long? value)
     {
@@ -748,7 +746,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumber(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         double? value)
     {
@@ -760,7 +758,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         short? value)
     {
@@ -771,7 +769,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         int? value)
     {
@@ -782,7 +780,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         long? value)
     {
@@ -793,7 +791,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         float? value)
     {
@@ -804,7 +802,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         double? value)
     {
@@ -815,7 +813,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         short value)
     {
@@ -826,7 +824,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         int value)
     {
@@ -837,7 +835,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         long value)
     {
@@ -848,7 +846,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         float value)
     {
@@ -859,7 +857,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNumberIfNotZero(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         double value)
     {
@@ -870,7 +868,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringIfNotWhiteSpace(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         string? value)
     {
@@ -881,7 +879,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         DateTimeOffset? value)
     {
@@ -892,7 +890,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteString(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         object? value)
     {
@@ -904,7 +902,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteSerializableIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         ISentryJsonSerializable? value,
         IDiagnosticLogger? logger)
@@ -916,7 +914,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionaryIfNotEmpty(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, object?>>? dic,
         IDiagnosticLogger? logger)
@@ -929,7 +927,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDictionaryIfNotEmpty<TValue>(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, TValue>>? dic,
         IDiagnosticLogger? logger)
@@ -943,7 +941,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringDictionaryIfNotEmpty(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<KeyValuePair<string, string?>>? dic)
     {
@@ -955,7 +953,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteArrayIfNotEmpty<T>(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<T>? arr,
         IDiagnosticLogger? logger)
@@ -968,7 +966,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteStringArrayIfNotEmpty(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumerable<string?>? arr)
     {
@@ -980,7 +978,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteDynamicIfNotNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         object? value,
         IDiagnosticLogger? logger)
@@ -992,7 +990,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteString(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName,
         IEnumeration? value)
     {
@@ -1007,7 +1005,7 @@ internal static class JsonExtensions
     }
 
     public static void WriteNull(
-        this JsonTextWriter writer,
+        this SentryJsonWriter writer,
         string propertyName)
     {
         writer.WritePropertyName(propertyName);

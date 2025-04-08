@@ -27,7 +27,7 @@ internal class SetMetric : Metric
 
     public override void Add(double value) => _value.Add((int)value);
 
-    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger) =>
+    protected override void WriteValues(SentryJsonWriter writer, IDiagnosticLogger? logger) =>
         writer.WriteArrayIfNotEmpty("value", _value, logger);
 
     protected override IEnumerable<IConvertible> SerializedStatsdValues()

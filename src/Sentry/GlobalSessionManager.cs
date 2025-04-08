@@ -78,8 +78,7 @@ internal class GlobalSessionManager : ISessionManager
 
             try
             {
-                using var textWriter = new StreamWriter(file);
-                using var jsonWriter = new JsonTextWriter(textWriter);
+                using var jsonWriter = new SentryJsonWriter(file);
                 persistedSessionUpdate.WriteTo(jsonWriter, _options.DiagnosticLogger);
                 jsonWriter.Flush();
             }

@@ -46,7 +46,7 @@ public readonly struct SentryId : IEquatable<SentryId>, ISentryJsonSerializable
     public static SentryId Create() => new(Guid.NewGuid());
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger) => writer.WriteValue(ToString());
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger) => writer.WriteValue(ToString());
 
     /// <summary>
     /// Parses from string.

@@ -89,7 +89,7 @@ public sealed class Runtime : ISentryJsonSerializable, ICloneable<Runtime>, IUpd
     }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? _)
     {
         writer.WriteStartObject();
 

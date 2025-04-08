@@ -136,7 +136,7 @@ public sealed class SentryContexts : IDictionary<string, object>, ISentryJsonSer
     }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         var contexts = this.OrderBy(x => x.Key, StringComparer.Ordinal);
         writer.WriteStartObject();

@@ -34,7 +34,7 @@ public abstract class ViewHierarchyNode : ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 
@@ -60,5 +60,5 @@ public abstract class ViewHierarchyNode : ISentryJsonSerializable
     /// <summary>
     /// Gets automatically called and writes additional properties during <see cref="WriteTo"/>
     /// </summary>
-    protected abstract void WriteAdditionalProperties(JsonTextWriter writer, IDiagnosticLogger? logger);
+    protected abstract void WriteAdditionalProperties(SentryJsonWriter writer, IDiagnosticLogger? logger);
 }

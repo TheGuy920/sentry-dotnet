@@ -28,20 +28,16 @@ internal sealed class AsyncJsonSerializable : ISerializable
     public async Task SerializeAsync(Stream stream, IDiagnosticLogger? logger, CancellationToken cancellationToken = default)
     {
         var source = await Source.ConfigureAwait(false);
-        using var streamWriter = new StreamWriter(stream, Encoding.UTF8, 1024, true);
-        using var jsonWriter = new Newtonsoft.Json.JsonTextWriter(streamWriter);
+        using var jsonWriter = new SentryJsonWriter(stream);
         source.WriteTo(jsonWriter, logger);
         await jsonWriter.FlushAsync(cancellationToken).ConfigureAwait(false);
-        await streamWriter.FlushAsync().ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public void Serialize(Stream stream, IDiagnosticLogger? logger)
     {
-        using var streamWriter = new StreamWriter(stream, Encoding.UTF8, 1024, true);
-        using var jsonWriter = new Newtonsoft.Json.JsonTextWriter(streamWriter);
+        using var jsonWriter = new SentryJsonWriter(stream);
         Source.Result.WriteTo(jsonWriter, logger);
         jsonWriter.Flush();
-        streamWriter.Flush();
     }
 }

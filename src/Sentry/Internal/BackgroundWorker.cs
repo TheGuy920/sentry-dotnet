@@ -41,6 +41,7 @@ internal class BackgroundWorker : IBackgroundWorker, IDisposable
 
         options.LogDebug("Starting BackgroundWorker.");
         WorkerTask = Task.Run(DoWorkAsync);
+        Task.Run(() => _options.LogDebug("ASYNC LOG"));
     }
 
     /// <inheritdoc />

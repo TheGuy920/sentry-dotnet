@@ -56,7 +56,7 @@ public sealed class DebugImage : ISentryJsonSerializable
     internal Guid? ModuleVersionId { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

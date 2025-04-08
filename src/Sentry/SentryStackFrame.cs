@@ -150,7 +150,7 @@ public sealed class SentryStackFrame : ISentryJsonSerializable
     public long? FunctionId { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

@@ -126,7 +126,7 @@ public sealed class Mechanism : ISentryJsonSerializable
     public IDictionary<string, object> Data => InternalData ??= new Dictionary<string, object>();
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

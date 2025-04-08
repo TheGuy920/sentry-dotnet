@@ -174,7 +174,7 @@ public partial class SentryMonitorOptions : ISentryJsonSerializable
     internal SentryMonitorOptions() { }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         Debug.Assert(_type != SentryMonitorScheduleType.None, "The Monitor Options do not contain a valid interval." +
                                                               "Please update your monitor options by setting the Interval.");

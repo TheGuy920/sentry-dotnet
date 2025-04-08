@@ -74,10 +74,10 @@ internal abstract class Metric : ISentryJsonSerializable, ISentrySerializable
     /// <summary>
     /// Serializes metric values to JSON
     /// </summary>
-    protected abstract void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger);
+    protected abstract void WriteValues(SentryJsonWriter writer, IDiagnosticLogger? logger);
 
     /// <inheritdoc cref="ISentryJsonSerializable.WriteTo"/>
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WriteString("type", GetType().Name);

@@ -105,13 +105,10 @@ public sealed class Envelope : ISerializable, IDisposable
             ? Header.Append("sent_at", clock.GetUtcNow())
             : Header;
 
-        var writer = new JsonTextWriter(new StreamWriter(stream));
+        var writer = new SentryJsonWriter(stream);
 
-        using (writer)
-        {
-            writer.WriteDictionaryValue(headerItems, logger);
-            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
+        writer.WriteDictionaryValue(headerItems, logger);
+        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private void SerializeHeader(Stream stream, IDiagnosticLogger? logger, ISystemClock clock)
@@ -121,7 +118,7 @@ public sealed class Envelope : ISerializable, IDisposable
             ? Header.Append("sent_at", clock.GetUtcNow())
             : Header;
 
-        using var writer = new JsonTextWriter(new StreamWriter(stream));
+        var writer = new SentryJsonWriter(stream);
         writer.WriteDictionaryValue(headerItems, logger);
         writer.Flush();
     }

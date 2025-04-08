@@ -19,7 +19,7 @@ internal sealed class SampleProfile : ISentryJsonSerializable
     internal Internal.GrowableArray<Internal.GrowableArray<int>> Stacks = new(100);
     internal List<SentryThread> Threads = new(10);
 
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WritePropertyName("thread_metadata");
@@ -53,7 +53,7 @@ internal sealed class SampleProfile : ISentryJsonSerializable
         public int ThreadId = 0;
         public int StackId = 0;
 
-        public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+        public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
         {
             writer.WriteStartObject();
             writer.WritePropertyName("elapsed_since_start_ns");

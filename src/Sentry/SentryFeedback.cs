@@ -60,7 +60,7 @@ public sealed class SentryFeedback : ISentryJsonSerializable, ICloneable<SentryF
     }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         if (string.IsNullOrEmpty(Message))
         {

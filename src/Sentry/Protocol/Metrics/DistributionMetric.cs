@@ -27,7 +27,7 @@ internal class DistributionMetric : Metric
 
     public override void Add(double value) => _value.Add(value);
 
-    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger) =>
+    protected override void WriteValues(SentryJsonWriter writer, IDiagnosticLogger? logger) =>
         writer.WriteArrayIfNotEmpty<double>("value", _value, logger);
 
     protected override IEnumerable<IConvertible> SerializedStatsdValues()

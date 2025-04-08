@@ -69,7 +69,7 @@ public readonly struct SpanId : IEquatable<SpanId>, ISentryJsonSerializable
     }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? _)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? _)
     {
         Span<byte> convertedBytes = stackalloc byte[sizeof(long)];
         BitConverter.TryWriteBytes(convertedBytes, _value);

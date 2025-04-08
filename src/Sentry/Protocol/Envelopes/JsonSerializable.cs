@@ -21,19 +21,15 @@ internal sealed class JsonSerializable : ISerializable
     /// <inheritdoc />
     public async Task SerializeAsync(Stream stream, IDiagnosticLogger? logger, CancellationToken cancellationToken = default)
     {
-        var writer = new JsonTextWriter(new StreamWriter(stream));
-
-        // await using (writer.ConfigureAwait(false))
-        {
-            Source.WriteTo(writer, logger);
-            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
+        var writer = new SentryJsonWriter(stream);
+        Source.WriteTo(writer, logger);
+        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
     public void Serialize(Stream stream, IDiagnosticLogger? logger)
     {
-        using var writer = new JsonTextWriter(new StreamWriter(stream));
+        var writer = new SentryJsonWriter(stream);
         Source.WriteTo(writer, logger);
         writer.Flush();
     }

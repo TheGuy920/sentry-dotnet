@@ -28,7 +28,7 @@ internal sealed class ThreadPoolInfo : ISentryJsonSerializable
     public int AvailableWorkerThreads { get; }
     public int AvailableCompletionPortThreads { get; }
 
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

@@ -38,7 +38,7 @@ public sealed class SentryThread : ISentryJsonSerializable
     public SentryStackTrace? Stacktrace { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

@@ -25,7 +25,7 @@ internal class CounterMetric : Metric
 
     public override void Add(double value) => Value += value;
 
-    protected override void WriteValues(JsonTextWriter writer, IDiagnosticLogger? logger) =>
+    protected override void WriteValues(SentryJsonWriter writer, IDiagnosticLogger? logger) =>
         writer.WriteNumber("value", Value);
 
     protected override IEnumerable<IConvertible> SerializedStatsdValues()

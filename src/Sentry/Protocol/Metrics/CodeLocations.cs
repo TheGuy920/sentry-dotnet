@@ -17,7 +17,7 @@ internal class CodeLocations(long timestamp, IReadOnlyDictionary<MetricResourceI
     public long Timestamp => timestamp;
 
     /// <inheritdoc cref="ISentryJsonSerializable.WriteTo"/>
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WriteNumber("timestamp", Timestamp);

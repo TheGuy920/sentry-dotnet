@@ -46,7 +46,7 @@ public sealed class SentryException : ISentryJsonSerializable
     public Mechanism? Mechanism { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

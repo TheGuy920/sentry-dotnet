@@ -38,7 +38,7 @@ internal sealed class ProfileInfo : ISentryJsonSerializable
     public SentryTransaction? Transaction { get; set; }
 
 
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         // NOTE: some values are required by the protocol so we pass "" if we don't have them.
 

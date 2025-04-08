@@ -20,7 +20,7 @@ internal sealed class SentryValues<T> : ISentryJsonSerializable
     public SentryValues(IEnumerable<T>? values) => Values = values ?? Enumerable.Empty<T>();
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

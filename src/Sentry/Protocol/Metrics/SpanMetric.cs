@@ -42,7 +42,7 @@ internal record SpanMetric
     }
 
     /// <inheritdoc cref="ISentryJsonSerializable.WriteTo"/>
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
         writer.WriteNumber("min", Min);

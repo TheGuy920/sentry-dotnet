@@ -14,7 +14,7 @@ internal sealed class DebugMeta : ISentryJsonSerializable
     public List<DebugImage>? Images { get; set; }
 
     /// <inheritdoc />
-    public void WriteTo(JsonTextWriter writer, IDiagnosticLogger? logger)
+    public void WriteTo(SentryJsonWriter writer, IDiagnosticLogger? logger)
     {
         writer.WriteStartObject();
 

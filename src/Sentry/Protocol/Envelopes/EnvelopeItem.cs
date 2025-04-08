@@ -137,12 +137,9 @@ public sealed class EnvelopeItem : ISerializable, IDisposable
         IDiagnosticLogger? logger,
         CancellationToken cancellationToken)
     {
-        var writer = new JsonTextWriter(new StreamWriter(stream));
-        // await using (writer.ConfigureAwait(false))
-        {
-            writer.WriteDictionaryValue(header, logger);
-            await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
-        }
+        var writer = new SentryJsonWriter(stream);
+        writer.WriteDictionaryValue(header, logger);
+        await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
     }
 
     private static void SerializeHeader(
@@ -150,7 +147,7 @@ public sealed class EnvelopeItem : ISerializable, IDisposable
         IReadOnlyDictionary<string, object?> header,
         IDiagnosticLogger? logger)
     {
-        using var writer = new JsonTextWriter(new StreamWriter(stream));
+        using var writer = new SentryJsonWriter(stream);
         writer.WriteDictionaryValue(header, logger);
         writer.Flush();
     }
